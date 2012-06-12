@@ -26,7 +26,7 @@
 #include <linux/types.h>
 #include <sys/ioctl.h>
 
-#define SPIDEV_MAXPATH 32
+#define SPIDEV_MAXPATH 4096
 
 PyDoc_STRVAR(SpiDev_module_doc,
 	"This module defines an object type that allows SPI transactions\n"
@@ -94,7 +94,7 @@ SpiDev_dealloc(SpiDevObject *self)
 }
 
 static char *wrmsg = "Argument must be a list of at least one, "
-				"but not more than 32 integers";
+				"but not more than 4096 integers";
 
 PyDoc_STRVAR(SpiDev_write_doc,
 	"write([values]) -> None\n\n"
@@ -104,8 +104,8 @@ static PyObject *
 SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 {
 	int		status;
-	uint8_t	ii, len;
-	uint8_t	buf[32];
+	uint16_t	ii, len;
+	uint8_t	buf[SPIDEV_MAXPATH];
 	PyObject	*list;
 
 	if (!PyArg_ParseTuple(args, "O:write", &list))
@@ -116,7 +116,7 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
-	if ((len = PyList_GET_SIZE(list)) >  32) {
+	if ((len = PyList_GET_SIZE(list)) > SPIDEV_MAXPATH) {
 		PyErr_SetString(PyExc_OverflowError, wrmsg);
 		return NULL;
 	}
@@ -153,14 +153,14 @@ PyDoc_STRVAR(SpiDev_read_doc,
 static PyObject *
 SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 {
-	uint8_t	rxbuf[32];
+	uint8_t	rxbuf[SPIDEV_MAXPATH];
 	int		status, len, ii;
 	PyObject	*list;
 
 	if (!PyArg_ParseTuple(args, "i:read", &len))
 		return NULL;
 
-	/* read at least 1 byte, no more than 32 */
+	/* read at least 1 byte, no more than SPIDEV_MAXPATH */
 	if (len < 1)
 		len = 1;
 	else if (len > sizeof(rxbuf))
@@ -199,7 +199,7 @@ PyDoc_STRVAR(SpiDev_xfer_doc,
 static PyObject *
 SpiDev_xfer(SpiDevObject *self, PyObject *args)
 {
-	uint8_t ii, len;
+	uint16_t ii, len;
 	int status;
 	uint16_t delay_usecs = 0;
 	uint32_t speed_hz = 0;
@@ -220,7 +220,7 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
-	if ((len = PyList_GET_SIZE(list)) > 32) {
+	if ((len = PyList_GET_SIZE(list)) > SPIDEV_MAXPATH) {
 		PyErr_SetString(PyExc_OverflowError, wrmsg);
 		return NULL;
 	}
@@ -302,12 +302,12 @@ static PyObject *
 SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 {
 	static char *msg = "Argument must be a list of at least one, "
-				"but not more than 32 integers";
+				"but not more than 4096 integers";
 	int status;
 	uint16_t delay_usecs = 0;
 	uint32_t speed_hz = 0;
 	uint8_t bits_per_word = 0;
-	uint8_t ii, len;
+	uint16_t ii, len;
 	PyObject *list;
 	struct spi_ioc_transfer xfer;
 	uint8_t *txbuf, *rxbuf;
@@ -320,7 +320,7 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
-	if ((len = PyList_GET_SIZE(list)) > 32) {
+	if ((len = PyList_GET_SIZE(list)) > SPIDEV_MAXPATH) {
 		PyErr_SetString(PyExc_OverflowError, wrmsg);
 		return NULL;
 	}
