@@ -90,7 +90,7 @@ SpiDev_dealloc(SpiDevObject *self)
 	PyObject *ref = SpiDev_close(self);
 	Py_XDECREF(ref);
 
-	self->ob_type->tp_free((PyObject *)self);
+	Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
 static char *wrmsg = "Argument must be a list of at least one, "
@@ -123,11 +123,11 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = PyList_GET_ITEM(list, ii);
-		if (!PyInt_Check(val)) {
+		if (!PyLong_Check(val)) {
 			PyErr_SetString(PyExc_TypeError, wrmsg);
 			return NULL;
 		}
-		buf[ii] = (__u8)PyInt_AS_LONG(val);
+		buf[ii] = (__u8)PyLong_AS_LONG(val);
 	}
 
 	status = write(self->fd, &buf[0], len);
@@ -233,11 +233,11 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = PyList_GET_ITEM(list, ii);
-		if (!PyInt_Check(val)) {
+		if (!PyLong_Check(val)) {
 			PyErr_SetString(PyExc_TypeError, wrmsg);
 			return NULL;
 		}
-		txbuf[ii] = (__u8)PyInt_AS_LONG(val);
+		txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 		xferptr[ii].tx_buf = (unsigned long)&txbuf[ii];
 		xferptr[ii].rx_buf = (unsigned long)&rxbuf[ii];
 		xferptr[ii].len = 1;
@@ -254,11 +254,11 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 #else
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = PyList_GET_ITEM(list, ii);
-		if (!PyInt_Check(val)) {
+		if (!PyLong_Check(val)) {
 			PyErr_SetString(PyExc_TypeError, wrmsg);
 			return NULL;
 		}
-		txbuf[ii] = (__u8)PyInt_AS_LONG(val);
+		txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 	}
 
 	xfer.tx_buf = (unsigned long)txbuf;
@@ -330,11 +330,11 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = PyList_GET_ITEM(list, ii);
-		if (!PyInt_Check(val)) {
+		if (!PyLong_Check(val)) {
 			PyErr_SetString(PyExc_TypeError, msg);
 			return NULL;
 		}
-		txbuf[ii] = (__u8)PyInt_AS_LONG(val);
+		txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 	}
 
 	xfer.tx_buf = (unsigned long)txbuf;
@@ -457,13 +457,13 @@ SpiDev_set_mode(SpiDevObject *self, PyObject *val, void *closure)
 			"Cannot delete attribute");
 		return -1;
 	}
-	else if (!PyInt_Check(val)) {
+	else if (!PyLong_Check(val)) {
 		PyErr_SetString(PyExc_TypeError,
 			"The mode attribute must be an integer");
 		return -1;
 	}
 
-	mode = PyInt_AsLong(val);
+	mode = PyLong_AsLong(val);
 
 	if ( mode > 3 ) {
 		PyErr_SetString(PyExc_TypeError,
@@ -607,13 +607,13 @@ SpiDev_set_bits_per_word(SpiDevObject *self, PyObject *val, void *closure)
 			"Cannot delete attribute");
 		return -1;
 	}
-	else if (!PyInt_Check(val)) {
+	else if (!PyLong_Check(val)) {
 		PyErr_SetString(PyExc_TypeError,
 			"The bits_per_word attribute must be an integer");
 		return -1;
 	}
 
-	bits = PyInt_AsLong(val);
+	bits = PyLong_AsLong(val);
 
         if (bits < 8 || bits > 16) {
 		PyErr_SetString(PyExc_TypeError,
@@ -649,13 +649,13 @@ SpiDev_set_max_speed_hz(SpiDevObject *self, PyObject *val, void *closure)
 			"Cannot delete attribute");
 		return -1;
 	}
-	else if (!PyInt_Check(val)) {
+	else if (!PyLong_Check(val)) {
 		PyErr_SetString(PyExc_TypeError,
 			"The max_speed_hz attribute must be an integer");
 		return -1;
 	}
 
-	max_speed_hz = PyInt_AsLong(val);
+	max_speed_hz = PyLong_AsLong(val);
 
 	if (self->max_speed_hz != max_speed_hz) {
 		if (ioctl(self->fd, SPI_IOC_WR_MAX_SPEED_HZ, &max_speed_hz) == -1) {
@@ -774,8 +774,7 @@ static PyMethodDef SpiDev_methods[] = {
 };
 
 static PyTypeObject SpiDevObjectType = {
-	PyObject_HEAD_INIT(NULL)
-	0,				/* ob_size */
+	PyVarObject_HEAD_INIT(NULL, 0)
 	"SpiDev",			/* tp_name */
 	sizeof(SpiDevObject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -819,19 +818,33 @@ static PyMethodDef SpiDev_module_methods[] = {
 	{NULL}
 };
 
-#ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
-#define PyMODINIT_FUNC void
-#endif
+static struct PyModuleDef moduledef = {
+	PyModuleDef_HEAD_INIT,
+	"spidev",
+	SpiDev_module_doc,
+	-1,
+	SpiDev_module_methods,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+
+//#ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
+//#define PyMODINIT_FUNC void
+//#endif
 PyMODINIT_FUNC
-initspidev(void)
+PyInit_spidev(void)
 {
 	PyObject* m;
 
 	if (PyType_Ready(&SpiDevObjectType) < 0)
-		return;
+		return NULL;
 
-	m = Py_InitModule3("spidev", SpiDev_module_methods, SpiDev_module_doc);
+	m = PyModule_Create(&moduledef);
 	Py_INCREF(&SpiDevObjectType);
 	PyModule_AddObject(m, "SpiDev", (PyObject *)&SpiDevObjectType);
+
+	return m;
 }
 
