@@ -283,7 +283,9 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	// WA:
 	// in CS_HIGH mode CS isn't pulled to low after transfer, but after read
 	// reading 0 bytes doesnt matter but brings cs down
-	status = read(self->fd, &rxbuf[0], 0);
+	// tomdean:
+	// Stop generating an extra CS except in mode CS_HOGH
+	if (self->mode & SPI_CS_HIGH) status = read(self->fd, &rxbuf[0], 0);
 
 	free(txbuf);
 	free(rxbuf);
@@ -357,7 +359,9 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	// WA:
 	// in CS_HIGH mode CS isnt pulled to low after transfer
 	// reading 0 bytes doesn't really matter but brings CS down
-	status = read(self->fd, &rxbuf[0], 0);
+	// tomdean:
+	// Stop generating an extra CS except in mode CS_HOGH
+	if (self->mode & SPI_CS_HIGH) status = read(self->fd, &rxbuf[0], 0);
 
 	free(txbuf);
 	free(rxbuf);
