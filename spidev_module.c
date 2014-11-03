@@ -774,7 +774,12 @@ static PyMethodDef SpiDev_methods[] = {
 };
 
 static PyTypeObject SpiDevObjectType = {
+#if PY_MAJOR_VERSION >= 3
 	PyVarObject_HEAD_INIT(NULL, 0)
+#else
+	PyObject_HEAD_INIT(NULL)
+	0,				/* ob_size */
+#endif
 	"SpiDev",			/* tp_name */
 	sizeof(SpiDevObject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
@@ -818,6 +823,7 @@ static PyMethodDef SpiDev_module_methods[] = {
 	{NULL}
 };
 
+#if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
 	PyModuleDef_HEAD_INIT,
 	"spidev",
@@ -829,22 +835,38 @@ static struct PyModuleDef moduledef = {
 	NULL,
 	NULL,
 };
+#else
+#ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
+#define PyMODINIT_FUNC void
+#endif
+#endif
 
-//#ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
-//#define PyMODINIT_FUNC void
-//#endif
+#if PY_MAJOR_VERSION >= 3
 PyMODINIT_FUNC
 PyInit_spidev(void)
+#else
+initspidev(void)
+#endif
 {
 	PyObject* m;
 
 	if (PyType_Ready(&SpiDevObjectType) < 0)
+#if PY_MAJOR_VERSION >= 3
 		return NULL;
+#else
+		return;
+#endif
 
+#if PY_MAJOR_VERSION >= 3
 	m = PyModule_Create(&moduledef);
+#else
+	m = Py_InitModule3("spidev", SpiDev_module_methods, SpiDev_module_doc);
+#endif
 	Py_INCREF(&SpiDevObjectType);
 	PyModule_AddObject(m, "SpiDev", (PyObject *)&SpiDevObjectType);
 
+#if PY_MAJOR_VERSION >= 3
 	return m;
+#endif
 }
 
