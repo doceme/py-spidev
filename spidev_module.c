@@ -28,6 +28,13 @@
 
 #define SPIDEV_MAXPATH 4096
 
+
+#if PY_MAJOR_VERSION < 3
+#define PyLong_AS_LONG(val) PyInt_AS_LONG(val)
+#define PyLong_AsLong(val) PyInt_AsLong(val)
+#define PyLong_Check(val) PyInt_Check(val)
+#endif
+
 PyDoc_STRVAR(SpiDev_module_doc,
 	"This module defines an object type that allows SPI transactions\n"
 	"on hosts running the Linux kernel. The host kernel must have SPI\n"
