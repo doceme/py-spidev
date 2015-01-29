@@ -242,6 +242,9 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 		PyObject *val = PyList_GET_ITEM(list, ii);
 		if (!PyLong_Check(val)) {
 			PyErr_SetString(PyExc_TypeError, wrmsg);
+			free(xferptr);
+			free(txbuf);
+			free(rxbuf);
 			return NULL;
 		}
 		txbuf[ii] = (__u8)PyLong_AS_LONG(val);
@@ -256,6 +259,9 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	status = ioctl(self->fd, SPI_IOC_MESSAGE(len), xferptr);
 	if (status < 0) {
 		PyErr_SetFromErrno(PyExc_IOError);
+		free(xferptr);
+		free(txbuf);
+		free(rxbuf);
 		return NULL;
 	}
 #else
@@ -263,6 +269,8 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 		PyObject *val = PyList_GET_ITEM(list, ii);
 		if (!PyLong_Check(val)) {
 			PyErr_SetString(PyExc_TypeError, wrmsg);
+			free(txbuf);
+			free(rxbuf);
 			return NULL;
 		}
 		txbuf[ii] = (__u8)PyLong_AS_LONG(val);
@@ -278,10 +286,13 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	status = ioctl(self->fd, SPI_IOC_MESSAGE(1), &xfer);
 	if (status < 0) {
 		PyErr_SetFromErrno(PyExc_IOError);
+		free(txbuf);
+		free(rxbuf);
 		return NULL;
 	}
 #endif
 
+	list = PyList_New(len);
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
 		PyList_SET_ITEM(list, ii, val);
@@ -297,7 +308,6 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	free(txbuf);
 	free(rxbuf);
 
-	Py_INCREF(list);
 	return list;
 }
 
@@ -341,6 +351,8 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 		PyObject *val = PyList_GET_ITEM(list, ii);
 		if (!PyLong_Check(val)) {
 			PyErr_SetString(PyExc_TypeError, msg);
+			free(txbuf);
+			free(rxbuf);
 			return NULL;
 		}
 		txbuf[ii] = (__u8)PyLong_AS_LONG(val);
@@ -356,9 +368,12 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	status = ioctl(self->fd, SPI_IOC_MESSAGE(1), &xfer);
 	if (status < 0) {
 		PyErr_SetFromErrno(PyExc_IOError);
+		free(txbuf);
+		free(rxbuf);
 		return NULL;
 	}
 
+	list = PyList_New(len);
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
 		PyList_SET_ITEM(list, ii, val);
@@ -373,7 +388,6 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	free(txbuf);
 	free(rxbuf);
 
-	Py_INCREF(list);
 	return list;
 }
 
