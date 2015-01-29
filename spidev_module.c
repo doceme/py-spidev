@@ -251,6 +251,12 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 		xferptr[ii].delay_usecs = delay;
 		xferptr[ii].speed_hz = speed_hz ? speed_hz : self->max_speed_hz;
 		xferptr[ii].bits_per_word = bits_per_word ? bits_per_word : self->bits_per_word;
+#ifdef SPI_IOC_WR_MODE32
+		xferptr[ii].tx_nbits = 0;
+#endif
+#ifdef SPI_IOC_RD_MODE32
+		xferptr[ii].rx_nbits = 0;
+#endif
 	}
 
 	status = ioctl(self->fd, SPI_IOC_MESSAGE(len), xferptr);
@@ -274,6 +280,12 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	xfer.delay_usecs = delay_usecs;
 	xfer.speed_hz = speed_hz ? speed_hz : self->max_speed_hz;
 	xfer.bits_per_word = bits_per_word ? bits_per_word : self->bits_per_word;
+#ifdef SPI_IOC_WR_MODE32
+        xfer.tx_nbits = 0;
+#endif
+#ifdef SPI_IOC_RD_MODE32
+        xfer.rx_nbits = 0;
+#endif
 
 	status = ioctl(self->fd, SPI_IOC_MESSAGE(1), &xfer);
 	if (status < 0) {
