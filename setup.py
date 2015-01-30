@@ -3,7 +3,7 @@
 from distutils.core import setup, Extension
 
 setup(	name="spidev",
-	version="2.0",
+	version="3.0",
 	description="Python bindings for Linux SPI access through spidev",
 	author="Volker Thoms",
 	author_email="unconnected@gmx.de",
