@@ -37,12 +37,12 @@ Read n bytes from SPI device.
 
 Writes a list of values to SPI device.
 
-####xfer(list of values, delay)
+####xfer(list of values[, speed_hz, delay_usec, bits_per_word])
 
 Performs an SPI transaction. Chip-select should be released and reactivated between blocks.
 Delay specifies the delay in usec between blocks.
 
-####xfer2(list of values)
+####xfer2(list of values[, speed_hz, delay_usec, bits_per_word])
 
 Performs an SPI transaction. Chip-select should be held active between blocks.
 
