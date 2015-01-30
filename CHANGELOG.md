@@ -5,6 +5,7 @@
 * Memset fix recommended by Dougie Lawson
 * Fixes for Kernel 3.15+ from https://github.com/chrillomat/py-spidev
 * Fixes for Python 3/2 compatibility.
+* Added subclassing support - https://github.com/doceme/py-spidev/issues/10
 
 ## 2.0
 
