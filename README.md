@@ -1,10 +1,12 @@
-#Python Spidev
+Python Spidev
+=============
 
 This project contains a python module for interfacing with SPI devices from user space via the spidev linux kernel driver.
 
 This is a modified version of the code originally found [here](http://elk.informatik.fh-augsburg.de/da/da-49/trees/pyap7k/lang/py-spi)
 
-##Usage
+Usage
+-----
 
 ```python
 import spidev
@@ -13,7 +15,8 @@ spi.open(bus, device)
 to_send = [0x01, 0x02, 0x03]
 spi.xfer(to_send)
 ```
-##Settings
+Settings
+--------
 
 * bits_per_word
 * cshigh
@@ -23,30 +26,31 @@ spi.xfer(to_send)
 * mode - SPI mode as two bit pattern of clock polarity and phase [CPOL|CPHA], min: 0b00 = 0, max: 0b11 = 3
 * threewire - SI/SO signals shared
 
-##Methods
+Methods
+-------
 
-####open(bus, device)
+    open(bus, device)
 
 Connects to the specified SPI device, opening /dev/spidev-bus.device
 
-####readbytes(n)
+    readbytes(n)
 
 Read n bytes from SPI device.
 
-####writebytes(list of values)
+    writebytes(list of values)
 
 Writes a list of values to SPI device.
 
-####xfer(list of values[, speed_hz, delay_usec, bits_per_word])
+    xfer(list of values[, speed_hz, delay_usec, bits_per_word])
 
 Performs an SPI transaction. Chip-select should be released and reactivated between blocks.
 Delay specifies the delay in usec between blocks.
 
-####xfer2(list of values[, speed_hz, delay_usec, bits_per_word])
+    xfer2(list of values[, speed_hz, delay_usec, bits_per_word])
 
 Performs an SPI transaction. Chip-select should be held active between blocks.
 
-####close()
+    close()
 
 Disconnects from the SPI device.
 
