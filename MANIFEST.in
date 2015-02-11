@@ -1,0 +1,5 @@
+include spidev_module.c
+include README.md
+include CHANGELOG.md
+include LICENSE.md
+include setup.py

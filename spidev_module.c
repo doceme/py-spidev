@@ -214,8 +214,10 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	PyObject *list;
 #ifdef SPIDEV_SINGLE
 	struct spi_ioc_transfer *xferptr;
+	memset(&xferptr, 0, sizeof(xferptr));
 #else
 	struct spi_ioc_transfer xfer;
+	memset(&xfer, 0, sizeof(xfer));
 #endif
 	uint8_t *txbuf, *rxbuf;
 
@@ -341,6 +343,7 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	uint16_t ii, len;
 	PyObject *list;
 	struct spi_ioc_transfer xfer;
+	memset(&xfer, 0, sizeof(xfer));
 	uint8_t *txbuf, *rxbuf;
 
 	if (!PyArg_ParseTuple(args, "O|IHB:xfer2", &list, &speed_hz, &delay_usecs, &bits_per_word))
@@ -835,7 +838,7 @@ static PyTypeObject SpiDevObjectType = {
 	0,				/* tp_getattro */
 	0,				/* tp_setattro */
 	0,				/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,		/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	SpiDevObjectType_doc,		/* tp_doc */
 	0,				/* tp_traverse */
 	0,				/* tp_clear */
