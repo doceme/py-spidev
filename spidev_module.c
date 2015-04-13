@@ -422,6 +422,18 @@ static int __spidev_set_mode( int fd, __u8 mode) {
 	return 0;
 }
 
+PyDoc_STRVAR(SpiDev_fileno_doc,
+	"fileno() -> integer \"file descriptor\"\n\n"
+	"This is needed for lower-level file interfaces, such as os.read().\n");
+
+static PyObject *
+SpiDev_fileno(SpiDevObject *self)
+{
+	PyObject *result = Py_BuildValue("i", self->fd);
+	Py_INCREF(result);
+	return result;
+}
+
 static PyObject *
 SpiDev_get_mode(SpiDevObject *self, void *closure)
 {
@@ -802,6 +814,8 @@ static PyMethodDef SpiDev_methods[] = {
 		SpiDev_open_doc},
 	{"close", (PyCFunction)SpiDev_close, METH_NOARGS,
 		SpiDev_close_doc},
+	{"fileno", (PyCFunction)SpiDev_fileno, METH_NOARGS,
+		SpiDev_fileno_doc},
 	{"readbytes", (PyCFunction)SpiDev_readbytes, METH_VARARGS,
 		SpiDev_read_doc},
 	{"writebytes", (PyCFunction)SpiDev_writebytes, METH_VARARGS,
