@@ -193,7 +193,6 @@ SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 		PyList_SET_ITEM(list, ii, val);
 	}
 
-	Py_INCREF(list);
 	return list;
 }
 
