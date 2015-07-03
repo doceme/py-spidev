@@ -24,6 +24,5 @@ setup(	name		= "spidev",
 	license		= "GPLv2",
 	classifiers	= classifiers,
 	url		= "http://github.com/doceme/py-spidev",
-	include_dirs	= ["/usr/src/linux/include"],
 	ext_modules	= [Extension("spidev", ["spidev_module.c"])]
 )

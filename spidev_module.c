@@ -32,7 +32,6 @@
 #if PY_MAJOR_VERSION < 3
 #define PyLong_AS_LONG(val) PyInt_AS_LONG(val)
 #define PyLong_AsLong(val) PyInt_AsLong(val)
-#define PyLong_Check(val) PyInt_Check(val)
 #endif
 
 PyDoc_STRVAR(SpiDev_module_doc,
@@ -898,7 +897,7 @@ static struct PyModuleDef moduledef = {
 PyMODINIT_FUNC
 PyInit_spidev(void)
 #else
-initspidev(void)
+void initspidev(void)
 #endif
 {
 	PyObject* m;
