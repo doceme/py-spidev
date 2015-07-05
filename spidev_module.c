@@ -507,13 +507,15 @@ SpiDev_set_mode(SpiDevObject *self, PyObject *val, void *closure)
 			"Cannot delete attribute");
 		return -1;
 	}
-	else if (!PyLong_Check(val)) {
+	else if (PyLong_Check(val)) {
+		mode = PyLong_AsLong(val);
+	} else if (PyInt_Check(val)) {
+		mode = PyInt_AsLong(val);
+	} else {
 		PyErr_SetString(PyExc_TypeError,
 			"The mode attribute must be an integer");
 		return -1;
 	}
-
-	mode = PyLong_AsLong(val);
 
 	if ( mode > 3 ) {
 		PyErr_SetString(PyExc_TypeError,
