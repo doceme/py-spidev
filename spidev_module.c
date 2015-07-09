@@ -34,6 +34,14 @@
 #define PyLong_AsLong(val) PyInt_AsLong(val)
 #endif
 
+// Macros needed for Python 3
+#ifndef PyInt_Check
+#define PyInt_Check			PyLong_Check
+#define PyInt_FromLong	PyLong_FromLong
+#define PyInt_AsLong		PyLong_AsLong
+#define PyInt_Type			PyLong_Type
+#endif
+
 PyDoc_STRVAR(SpiDev_module_doc,
 	"This module defines an object type that allows SPI transactions\n"
 	"on hosts running the Linux kernel. The host kernel must have SPI\n"
