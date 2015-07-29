@@ -5,6 +5,8 @@ This project contains a python module for interfacing with SPI devices from user
 
 This is a modified version of the code originally found [here](http://elk.informatik.fh-augsburg.de/da/da-49/trees/pyap7k/lang/py-spi)
 
+All code is GPLv2 licensed unless explicitly stated otherwise.
+
 Usage
 -----
 
@@ -53,4 +55,3 @@ Performs an SPI transaction. Chip-select should be held active between blocks.
     close()
 
 Disconnects from the SPI device.
-
