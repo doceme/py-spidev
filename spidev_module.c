@@ -125,7 +125,7 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "O:write", &list))
 		return NULL;
 
-	if (!PyList_Check(list)) {
+	if (!PyList_Size(list) > 0) {
 		PyErr_SetString(PyExc_TypeError, wrmsg);
 		return NULL;
 	}
@@ -137,11 +137,19 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = PyList_GET_ITEM(list, ii);
-		if (!PyLong_Check(val)) {
-			PyErr_SetString(PyExc_TypeError, wrmsg);
-			return NULL;
+#if PY_MAJOR_VERSION < 3
+		if (PyInt_Check(val)) {
+			buf[ii] = (__u8)PyInt_AS_LONG(val);
+		} else
+#endif
+		{
+			if (PyLong_Check(val)) {
+				buf[ii] = (__u8)PyLong_AS_LONG(val);
+			} else {
+				PyErr_SetString(PyExc_TypeError, wrmsg);
+				return NULL;
+			}
 		}
-		buf[ii] = (__u8)PyLong_AS_LONG(val);
 	}
 
 	status = write(self->fd, &buf[0], len);
@@ -230,7 +238,7 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "O|IHB:xfer", &list, &speed_hz, &delay_usecs, &bits_per_word))
 		return NULL;
 
-	if (!PyList_Check(list)) {
+	if (!PyList_Size(list) > 0) {
 		PyErr_SetString(PyExc_TypeError, wrmsg);
 		return NULL;
 	}
@@ -248,14 +256,22 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = PyList_GET_ITEM(list, ii);
-		if (!PyLong_Check(val)) {
-			PyErr_SetString(PyExc_TypeError, wrmsg);
-			free(xferptr);
-			free(txbuf);
-			free(rxbuf);
-			return NULL;
+#if PY_MAJOR_VERSION < 3
+		if (PyInt_Check(val)) {
+			txbuf[ii] = (__u8)PyInt_AS_LONG(val);
+		} else
+#endif
+		{
+			if (PyLong_Check(val)) {
+				txbuf[ii] = (__u8)PyLong_AS_LONG(val);
+			} else {
+				PyErr_SetString(PyExc_TypeError, wrmsg);
+				free(xferptr);
+				free(txbuf);
+				free(rxbuf);
+				return NULL;
+			}
 		}
-		txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 		xferptr[ii].tx_buf = (unsigned long)&txbuf[ii];
 		xferptr[ii].rx_buf = (unsigned long)&rxbuf[ii];
 		xferptr[ii].len = 1;
@@ -281,13 +297,21 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 #else
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = PyList_GET_ITEM(list, ii);
-		if (!PyLong_Check(val)) {
-			PyErr_SetString(PyExc_TypeError, wrmsg);
-			free(txbuf);
-			free(rxbuf);
-			return NULL;
+#if PY_MAJOR_VERSION < 3
+		if (PyInt_Check(val)) {
+			txbuf[ii] = (__u8)PyInt_AS_LONG(val);
+		} else
+#endif
+		{
+			if (PyLong_Check(val)) {
+				txbuf[ii] = (__u8)PyLong_AS_LONG(val);
+			} else {
+				PyErr_SetString(PyExc_TypeError, wrmsg);
+				free(txbuf);
+				free(rxbuf);
+				return NULL;
+			}
 		}
-		txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 	}
 
 	xfer.tx_buf = (unsigned long)txbuf;
@@ -355,7 +379,7 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "O|IHB:xfer2", &list, &speed_hz, &delay_usecs, &bits_per_word))
 		return NULL;
 
-	if (!PyList_Check(list)) {
+	if (!PyList_Size(list) > 0) {
 		PyErr_SetString(PyExc_TypeError, wrmsg);
 		return NULL;
 	}
@@ -370,13 +394,21 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = PyList_GET_ITEM(list, ii);
-		if (!PyLong_Check(val)) {
-			PyErr_SetString(PyExc_TypeError, msg);
-			free(txbuf);
-			free(rxbuf);
-			return NULL;
+#if PY_MAJOR_VERSION < 3
+		if (PyInt_Check(val)) {
+			txbuf[ii] = (__u8)PyInt_AS_LONG(val);
+		} else
+#endif
+		{
+			if (PyLong_Check(val)) {
+				txbuf[ii] = (__u8)PyLong_AS_LONG(val);
+			} else {
+				PyErr_SetString(PyExc_TypeError, msg);
+				free(txbuf);
+				free(rxbuf);
+				return NULL;
+			}
 		}
-		txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 	}
 
 	xfer.tx_buf = (unsigned long)txbuf;
@@ -515,15 +547,21 @@ SpiDev_set_mode(SpiDevObject *self, PyObject *val, void *closure)
 			"Cannot delete attribute");
 		return -1;
 	}
-	else if (PyLong_Check(val)) {
-		mode = PyLong_AsLong(val);
-	} else if (PyInt_Check(val)) {
-		mode = PyInt_AsLong(val);
-	} else {
-		PyErr_SetString(PyExc_TypeError,
-			"The mode attribute must be an integer");
-		return -1;
+#if PY_MAJOR_VERSION < 3
+	if (PyInt_Check(val)) {
+		mode = PyInt_AS_LONG(val);
+	} else
+#endif
+	{
+		if (PyLong_Check(val)) {
+			mode = PyLong_AS_LONG(val);
+		} else {
+			PyErr_SetString(PyExc_TypeError,
+				"The mode attribute must be an integer");
+			return -1;
+		}
 	}
+
 
 	if ( mode > 3 ) {
 		PyErr_SetString(PyExc_TypeError,
@@ -667,13 +705,20 @@ SpiDev_set_bits_per_word(SpiDevObject *self, PyObject *val, void *closure)
 			"Cannot delete attribute");
 		return -1;
 	}
-	else if (!PyLong_Check(val)) {
-		PyErr_SetString(PyExc_TypeError,
-			"The bits_per_word attribute must be an integer");
-		return -1;
+#if PY_MAJOR_VERSION < 3
+	if (PyInt_Check(val)) {
+		bits = PyInt_AS_LONG(val);
+	} else
+#endif
+	{
+		if (PyLong_Check(val)) {
+			bits = PyLong_AS_LONG(val);
+		} else {
+			PyErr_SetString(PyExc_TypeError,
+				"The bits_per_word attribute must be an integer");
+			return -1;
+		}
 	}
-
-	bits = PyLong_AsLong(val);
 
         if (bits < 8 || bits > 16) {
 		PyErr_SetString(PyExc_TypeError,
@@ -709,13 +754,20 @@ SpiDev_set_max_speed_hz(SpiDevObject *self, PyObject *val, void *closure)
 			"Cannot delete attribute");
 		return -1;
 	}
-	else if (!PyLong_Check(val)) {
-		PyErr_SetString(PyExc_TypeError,
-			"The max_speed_hz attribute must be an integer");
-		return -1;
+#if PY_MAJOR_VERSION < 3
+	if (PyInt_Check(val)) {
+		max_speed_hz = PyInt_AS_LONG(val);
+	} else
+#endif
+	{
+		if (PyLong_Check(val)) {
+			max_speed_hz = PyLong_AS_LONG(val);
+		} else {
+			PyErr_SetString(PyExc_TypeError,
+				"The max_speed_hz attribute must be an integer");
+			return -1;
+		}
 	}
-
-	max_speed_hz = PyLong_AsLong(val);
 
 	if (self->max_speed_hz != max_speed_hz) {
 		if (ioctl(self->fd, SPI_IOC_WR_MAX_SPEED_HZ, &max_speed_hz) == -1) {
