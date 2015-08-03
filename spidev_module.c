@@ -107,8 +107,9 @@ SpiDev_dealloc(SpiDevObject *self)
 	Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-static char *wrmsg = "Argument must be a list of at least one, "
-				"but not more than 4096 integers";
+static char *wrmsg_list0 = "Empty argument list.";
+static char *wrmsg_listmax = "Argument list size exceeds %d bytes.";
+static char *wrmsg_val = "Non-Int/Long value in arguments: %x.";
 
 PyDoc_STRVAR(SpiDev_write_doc,
 	"write([values]) -> None\n\n"
@@ -121,17 +122,19 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 	uint16_t	ii, len;
 	uint8_t	buf[SPIDEV_MAXPATH];
 	PyObject	*list;
+	char	wrmsg_text[4096];
 
 	if (!PyArg_ParseTuple(args, "O:write", &list))
 		return NULL;
 
 	if (!PyList_Size(list) > 0) {
-		PyErr_SetString(PyExc_TypeError, wrmsg);
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
 
 	if ((len = PyList_GET_SIZE(list)) > SPIDEV_MAXPATH) {
-		PyErr_SetString(PyExc_OverflowError, wrmsg);
+		snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
+		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
 		return NULL;
 	}
 
@@ -146,7 +149,8 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 			if (PyLong_Check(val)) {
 				buf[ii] = (__u8)PyLong_AS_LONG(val);
 			} else {
-				PyErr_SetString(PyExc_TypeError, wrmsg);
+				snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_val, val);
+				PyErr_SetString(PyExc_TypeError, wrmsg_text);
 				return NULL;
 			}
 		}
@@ -234,17 +238,19 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	memset(&xfer, 0, sizeof(xfer));
 #endif
 	uint8_t *txbuf, *rxbuf;
+	char	wrmsg_text[4096];
 
 	if (!PyArg_ParseTuple(args, "O|IHB:xfer", &list, &speed_hz, &delay_usecs, &bits_per_word))
 		return NULL;
 
 	if (!PyList_Size(list) > 0) {
-		PyErr_SetString(PyExc_TypeError, wrmsg);
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
 
 	if ((len = PyList_GET_SIZE(list)) > SPIDEV_MAXPATH) {
-		PyErr_SetString(PyExc_OverflowError, wrmsg);
+		snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
+		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
 		return NULL;
 	}
 
@@ -265,7 +271,8 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 			if (PyLong_Check(val)) {
 				txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 			} else {
-				PyErr_SetString(PyExc_TypeError, wrmsg);
+				snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_val, val);
+				PyErr_SetString(PyExc_TypeError, wrmsg_text);
 				free(xferptr);
 				free(txbuf);
 				free(rxbuf);
@@ -306,7 +313,8 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 			if (PyLong_Check(val)) {
 				txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 			} else {
-				PyErr_SetString(PyExc_TypeError, wrmsg);
+				snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_val, val);
+				PyErr_SetString(PyExc_TypeError, wrmsg_text);
 				free(txbuf);
 				free(rxbuf);
 				return NULL;
@@ -364,8 +372,6 @@ PyDoc_STRVAR(SpiDev_xfer2_doc,
 static PyObject *
 SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 {
-	static char *msg = "Argument must be a list of at least one, "
-				"but not more than 4096 integers";
 	int status;
 	uint16_t delay_usecs = 0;
 	uint32_t speed_hz = 0;
@@ -375,17 +381,19 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	struct spi_ioc_transfer xfer;
 	memset(&xfer, 0, sizeof(xfer));
 	uint8_t *txbuf, *rxbuf;
+	char	wrmsg_text[4096];
 
 	if (!PyArg_ParseTuple(args, "O|IHB:xfer2", &list, &speed_hz, &delay_usecs, &bits_per_word))
 		return NULL;
 
 	if (!PyList_Size(list) > 0) {
-		PyErr_SetString(PyExc_TypeError, wrmsg);
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
 
 	if ((len = PyList_GET_SIZE(list)) > SPIDEV_MAXPATH) {
-		PyErr_SetString(PyExc_OverflowError, wrmsg);
+		snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
+		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
 		return NULL;
 	}
 
@@ -403,7 +411,8 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 			if (PyLong_Check(val)) {
 				txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 			} else {
-				PyErr_SetString(PyExc_TypeError, msg);
+				snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_val, val);
+				PyErr_SetString(PyExc_TypeError, wrmsg_text);
 				free(txbuf);
 				free(rxbuf);
 				return NULL;
