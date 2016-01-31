@@ -25,6 +25,7 @@
 #include <linux/spi/spidev.h>
 #include <linux/types.h>
 #include <sys/ioctl.h>
+#include <linux/ioctl.h>
 
 #define SPIDEV_MAXPATH 4096
 
