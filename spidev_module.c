@@ -124,10 +124,10 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 	PyObject	*list;
 	char	wrmsg_text[4096];
 
-	if (!PyArg_ParseTuple(args, "O:write", &list))
+	if (!PyArg_ParseTuple(args, "O!:write", &PyList_Type, &list))
 		return NULL;
 
-	if (!PyList_Size(list) > 0) {
+	if (PyList_Size(list) <= 0) {
 		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
@@ -189,7 +189,7 @@ SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 	/* read at least 1 byte, no more than SPIDEV_MAXPATH */
 	if (len < 1)
 		len = 1;
-	else if (len > sizeof(rxbuf))
+	else if ((unsigned)len > sizeof(rxbuf))
 		len = sizeof(rxbuf);
 
 	memset(rxbuf, 0, sizeof rxbuf);
@@ -240,10 +240,10 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	uint8_t *txbuf, *rxbuf;
 	char	wrmsg_text[4096];
 
-	if (!PyArg_ParseTuple(args, "O|IHB:xfer", &list, &speed_hz, &delay_usecs, &bits_per_word))
+	if (!PyArg_ParseTuple(args, "O!|IHB:xfer", &PyList_Type, &list, &speed_hz, &delay_usecs, &bits_per_word))
 		return NULL;
 
-	if (!PyList_Size(list) > 0) {
+	if (PyList_Size(list) <= 0) {
 		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
@@ -383,10 +383,10 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	uint8_t *txbuf, *rxbuf;
 	char	wrmsg_text[4096];
 
-	if (!PyArg_ParseTuple(args, "O|IHB:xfer2", &list, &speed_hz, &delay_usecs, &bits_per_word))
+	if (!PyArg_ParseTuple(args, "O!|IHB:xfer2", &PyList_Type, &list, &speed_hz, &delay_usecs, &bits_per_word))
 		return NULL;
 
-	if (!PyList_Size(list) > 0) {
+	if (PyList_Size(list) <= 0) {
 		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
