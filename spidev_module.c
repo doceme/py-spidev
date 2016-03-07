@@ -330,10 +330,10 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	xfer.speed_hz = speed_hz ? speed_hz : self->max_speed_hz;
 	xfer.bits_per_word = bits_per_word ? bits_per_word : self->bits_per_word;
 #ifdef SPI_IOC_WR_MODE32
-        xfer.tx_nbits = 0;
+	xfer.tx_nbits = 0;
 #endif
 #ifdef SPI_IOC_RD_MODE32
-        xfer.rx_nbits = 0;
+	xfer.rx_nbits = 0;
 #endif
 
 	status = ioctl(self->fd, SPI_IOC_MESSAGE(1), &xfer);
@@ -730,9 +730,9 @@ SpiDev_set_bits_per_word(SpiDevObject *self, PyObject *val, void *closure)
 		}
 	}
 
-        if (bits < 8 || bits > 16) {
+		if (bits < 8 || bits > 16) {
 		PyErr_SetString(PyExc_TypeError,
-                                "invalid bits_per_word (8 to 16)");
+			"invalid bits_per_word (8 to 16)");
 		return -1;
 	}
 
@@ -879,6 +879,32 @@ PyDoc_STRVAR(SpiDevObjectType_doc,
 	"Return a new SPI object that is (optionally) connected to the\n"
 	"specified SPI device interface.\n");
 
+static
+PyObject *SpiDev_enter(PyObject *self, PyObject *args)
+{
+    if (!PyArg_ParseTuple(args, ""))
+        return NULL;
+
+    Py_INCREF(self);
+    return self;
+}
+
+static
+PyObject *SpiDev_exit(SpiDevObject *self, PyObject *args)
+{
+
+    PyObject *exc_type = 0;
+    PyObject *exc_value = 0;
+    PyObject *traceback = 0;
+    if (!PyArg_UnpackTuple(args, "__exit__", 3, 3, &exc_type, &exc_value,
+                           &traceback)) {
+        return 0;
+    }
+
+    SpiDev_close(self);
+    Py_RETURN_FALSE;
+}
+
 static PyMethodDef SpiDev_methods[] = {
 	{"open", (PyCFunction)SpiDev_open, METH_VARARGS | METH_KEYWORDS,
 		SpiDev_open_doc},
@@ -894,6 +920,10 @@ static PyMethodDef SpiDev_methods[] = {
 		SpiDev_xfer_doc},
 	{"xfer2", (PyCFunction)SpiDev_xfer2, METH_VARARGS,
 		SpiDev_xfer2_doc},
+	{"__enter__", (PyCFunction)SpiDev_enter, METH_VARARGS,
+		NULL},
+	{"__exit__", (PyCFunction)SpiDev_exit, METH_VARARGS,
+		NULL},
 	{NULL},
 };
 
@@ -993,4 +1023,3 @@ void initspidev(void)
 	return m;
 #endif
 }
-
