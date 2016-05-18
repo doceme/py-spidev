@@ -29,6 +29,7 @@
 
 #define SPIDEV_MAXPATH 4096
 
+#define SPIDEV_MODE_FLAGS (SPI_CPHA | SPI_LOOP | SPI_CPOL | SPI_NO_CS)
 
 #if PY_MAJOR_VERSION < 3
 #define PyLong_AS_LONG(val) PyInt_AS_LONG(val)
@@ -517,7 +518,7 @@ SpiDev_fileno(SpiDevObject *self)
 static PyObject *
 SpiDev_get_mode(SpiDevObject *self, void *closure)
 {
-	PyObject *result = Py_BuildValue("i", (self->mode & (SPI_CPHA | SPI_CPOL) ) );
+	PyObject *result = Py_BuildValue("i", (self->mode & SPIDEV_MODE_FLAGS ) );
 	Py_INCREF(result);
 	return result;
 }
@@ -612,8 +613,8 @@ SpiDev_set_mode(SpiDevObject *self, PyObject *val, void *closure)
 		return -1;
 	}
 
-	// clean and set CPHA and CPOL bits
-	tmp = ( self->mode & ~(SPI_CPHA | SPI_CPOL) ) | mode ;
+	// clean and set mode bits
+	tmp = ( self->mode & ~SPIDEV_MODE_FLAGS ) | mode ;
 
 	__spidev_set_mode(self->fd, tmp);
 
