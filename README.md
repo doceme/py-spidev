@@ -34,7 +34,7 @@ spi.mode = 0b01
 
 * `bits_per_word`
 * `cshigh`
-* `loop`
+* `loop` - Set the "SPI_LOOP" flag to enable loopback mode
 * `no_cs` - Set the "SPI_NO_CS" flag to disable use of the chip select (although the driver may still own the CS pin)
 * `lsbfirst`
 * `max_speed_hz`
