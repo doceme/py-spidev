@@ -578,6 +578,20 @@ SpiDev_get_loop(SpiDevObject *self, void *closure)
 	return result;
 }
 
+static PyObject *
+SpiDev_get_no_cs(SpiDevObject *self, void *closure)
+{
+        PyObject *result;
+
+        if (self->mode & SPI_NO_CS)
+                result = Py_True;
+        else
+                result = Py_False;
+
+        Py_INCREF(result);
+        return result;
+}
+
 
 static int
 SpiDev_set_mode(SpiDevObject *self, PyObject *val, void *closure)
@@ -701,6 +715,34 @@ SpiDev_set_3wire(SpiDevObject *self, PyObject *val, void *closure)
 	self->mode = tmp;
 	return 0;
 }
+
+static int
+SpiDev_set_no_cs(SpiDevObject *self, PyObject *val, void *closure)
+{
+        uint8_t tmp;
+
+        if (val == NULL) {
+                PyErr_SetString(PyExc_TypeError,
+                        "Cannot delete attribute");
+                return -1;
+        }
+        else if (!PyBool_Check(val)) {
+                PyErr_SetString(PyExc_TypeError,
+                        "The no_cs attribute must be boolean");
+                return -1;
+        }
+
+        if (val == Py_True)
+                tmp = self->mode | SPI_NO_CS;
+        else
+                tmp = self->mode & ~SPI_NO_CS;
+
+        __spidev_set_mode(self->fd, tmp);
+
+        self->mode = tmp;
+        return 0;
+}
+
 
 static int
 SpiDev_set_loop(SpiDevObject *self, PyObject *val, void *closure)
@@ -834,6 +876,8 @@ static PyGetSetDef SpiDev_getset[] = {
 			"LSB first\n"},
 	{"loop", (getter)SpiDev_get_loop, (setter)SpiDev_set_loop,
 			"loopback configuration\n"},
+	{"no_cs", (getter)SpiDev_get_no_cs, (setter)SpiDev_set_no_cs,
+			"disable chip select\n"},
 	{"bits_per_word", (getter)SpiDev_get_bits_per_word, (setter)SpiDev_set_bits_per_word,
 			"bits per word\n"},
 	{"max_speed_hz", (getter)SpiDev_get_max_speed_hz, (setter)SpiDev_set_max_speed_hz,
