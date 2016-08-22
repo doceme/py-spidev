@@ -25,6 +25,7 @@
 #include <linux/spi/spidev.h>
 #include <linux/types.h>
 #include <sys/ioctl.h>
+#include <linux/ioctl.h>
 
 #define SPIDEV_MAXPATH 4096
 
@@ -107,8 +108,9 @@ SpiDev_dealloc(SpiDevObject *self)
 	Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-static char *wrmsg = "Argument must be a list of at least one, "
-				"but not more than 4096 integers";
+static char *wrmsg_list0 = "Empty argument list.";
+static char *wrmsg_listmax = "Argument list size exceeds %d bytes.";
+static char *wrmsg_val = "Non-Int/Long value in arguments: %x.";
 
 PyDoc_STRVAR(SpiDev_write_doc,
 	"write([values]) -> None\n\n"
@@ -120,23 +122,28 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 	int		status;
 	uint16_t	ii, len;
 	uint8_t	buf[SPIDEV_MAXPATH];
-	PyObject	*list;
+	PyObject	*obj;
+	PyObject	*seq;
+	char	wrmsg_text[4096];
 
-	if (!PyArg_ParseTuple(args, "O:write", &list))
+	if (!PyArg_ParseTuple(args, "O:write", &obj))
 		return NULL;
 
-	if (!PyList_Size(list) > 0) {
-		PyErr_SetString(PyExc_TypeError, wrmsg);
+	seq = PySequence_Fast(obj, "expected a sequence");
+	len = PySequence_Fast_GET_SIZE(obj);
+	if (!seq || len <= 0) {
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
 
-	if ((len = PyList_GET_SIZE(list)) > SPIDEV_MAXPATH) {
-		PyErr_SetString(PyExc_OverflowError, wrmsg);
+	if (len > SPIDEV_MAXPATH) {
+		snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
+		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
 		return NULL;
 	}
 
 	for (ii = 0; ii < len; ii++) {
-		PyObject *val = PyList_GET_ITEM(list, ii);
+		PyObject *val = PySequence_Fast_GET_ITEM(seq, ii);
 #if PY_MAJOR_VERSION < 3
 		if (PyInt_Check(val)) {
 			buf[ii] = (__u8)PyInt_AS_LONG(val);
@@ -146,11 +153,14 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 			if (PyLong_Check(val)) {
 				buf[ii] = (__u8)PyLong_AS_LONG(val);
 			} else {
-				PyErr_SetString(PyExc_TypeError, wrmsg);
+				snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_val, val);
+				PyErr_SetString(PyExc_TypeError, wrmsg_text);
 				return NULL;
 			}
 		}
 	}
+
+	Py_DECREF(seq);
 
 	status = write(self->fd, &buf[0], len);
 
@@ -185,7 +195,7 @@ SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 	/* read at least 1 byte, no more than SPIDEV_MAXPATH */
 	if (len < 1)
 		len = 1;
-	else if (len > sizeof(rxbuf))
+	else if ((unsigned)len > sizeof(rxbuf))
 		len = sizeof(rxbuf);
 
 	memset(rxbuf, 0, sizeof rxbuf);
@@ -225,7 +235,8 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	uint16_t delay_usecs = 0;
 	uint32_t speed_hz = 0;
 	uint8_t bits_per_word = 0;
-	PyObject *list;
+	PyObject *obj;
+	PyObject *seq;
 #ifdef SPIDEV_SINGLE
 	struct spi_ioc_transfer *xferptr;
 	memset(&xferptr, 0, sizeof(xferptr));
@@ -234,17 +245,21 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	memset(&xfer, 0, sizeof(xfer));
 #endif
 	uint8_t *txbuf, *rxbuf;
+	char	wrmsg_text[4096];
 
-	if (!PyArg_ParseTuple(args, "O|IHB:xfer", &list, &speed_hz, &delay_usecs, &bits_per_word))
+	if (!PyArg_ParseTuple(args, "O|IHB:xfer", &obj, &speed_hz, &delay_usecs, &bits_per_word))
 		return NULL;
 
-	if (!PyList_Size(list) > 0) {
-		PyErr_SetString(PyExc_TypeError, wrmsg);
+	seq = PySequence_Fast(obj, "expected a sequence");
+	len = PySequence_Fast_GET_SIZE(obj);
+	if (!seq || len <= 0) {
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
 
-	if ((len = PyList_GET_SIZE(list)) > SPIDEV_MAXPATH) {
-		PyErr_SetString(PyExc_OverflowError, wrmsg);
+	if (len > SPIDEV_MAXPATH) {
+		snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
+		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
 		return NULL;
 	}
 
@@ -255,7 +270,7 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	xferptr = (struct spi_ioc_transfer*) malloc(sizeof(struct spi_ioc_transfer) * len);
 
 	for (ii = 0; ii < len; ii++) {
-		PyObject *val = PyList_GET_ITEM(list, ii);
+		PyObject *val = PySequence_Fast_GET_ITEM(seq, ii);
 #if PY_MAJOR_VERSION < 3
 		if (PyInt_Check(val)) {
 			txbuf[ii] = (__u8)PyInt_AS_LONG(val);
@@ -265,7 +280,8 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 			if (PyLong_Check(val)) {
 				txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 			} else {
-				PyErr_SetString(PyExc_TypeError, wrmsg);
+				snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_val, val);
+				PyErr_SetString(PyExc_TypeError, wrmsg_text);
 				free(xferptr);
 				free(txbuf);
 				free(rxbuf);
@@ -296,7 +312,7 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	}
 #else
 	for (ii = 0; ii < len; ii++) {
-		PyObject *val = PyList_GET_ITEM(list, ii);
+		PyObject *val = PySequence_Fast_GET_ITEM(seq, ii);
 #if PY_MAJOR_VERSION < 3
 		if (PyInt_Check(val)) {
 			txbuf[ii] = (__u8)PyInt_AS_LONG(val);
@@ -306,12 +322,18 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 			if (PyLong_Check(val)) {
 				txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 			} else {
-				PyErr_SetString(PyExc_TypeError, wrmsg);
+				snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_val, val);
+				PyErr_SetString(PyExc_TypeError, wrmsg_text);
 				free(txbuf);
 				free(rxbuf);
 				return NULL;
 			}
 		}
+	}
+
+	if (PyTuple_Check(obj)) {
+		Py_DECREF(seq);
+		seq = PySequence_List(obj);
 	}
 
 	xfer.tx_buf = (unsigned long)txbuf;
@@ -321,10 +343,10 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	xfer.speed_hz = speed_hz ? speed_hz : self->max_speed_hz;
 	xfer.bits_per_word = bits_per_word ? bits_per_word : self->bits_per_word;
 #ifdef SPI_IOC_WR_MODE32
-        xfer.tx_nbits = 0;
+	xfer.tx_nbits = 0;
 #endif
 #ifdef SPI_IOC_RD_MODE32
-        xfer.rx_nbits = 0;
+	xfer.rx_nbits = 0;
 #endif
 
 	status = ioctl(self->fd, SPI_IOC_MESSAGE(1), &xfer);
@@ -336,10 +358,9 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	}
 #endif
 
-	list = PyList_New(len);
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
-		PyList_SET_ITEM(list, ii, val);
+		PySequence_SetItem(seq, ii, val);
 	}
 
 	// WA:
@@ -352,7 +373,13 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	free(txbuf);
 	free(rxbuf);
 
-	return list;
+	if (PyTuple_Check(obj)) {
+		PyObject *old = seq;
+		seq = PySequence_Tuple(seq);
+		Py_DECREF(old);
+	}
+
+	return seq;
 }
 
 
@@ -364,28 +391,31 @@ PyDoc_STRVAR(SpiDev_xfer2_doc,
 static PyObject *
 SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 {
-	static char *msg = "Argument must be a list of at least one, "
-				"but not more than 4096 integers";
 	int status;
 	uint16_t delay_usecs = 0;
 	uint32_t speed_hz = 0;
 	uint8_t bits_per_word = 0;
 	uint16_t ii, len;
-	PyObject *list;
+	PyObject *obj;
+	PyObject *seq;
 	struct spi_ioc_transfer xfer;
 	memset(&xfer, 0, sizeof(xfer));
 	uint8_t *txbuf, *rxbuf;
+	char	wrmsg_text[4096];
 
-	if (!PyArg_ParseTuple(args, "O|IHB:xfer2", &list, &speed_hz, &delay_usecs, &bits_per_word))
+	if (!PyArg_ParseTuple(args, "O|IHB:xfer2", &obj, &speed_hz, &delay_usecs, &bits_per_word))
 		return NULL;
 
-	if (!PyList_Size(list) > 0) {
-		PyErr_SetString(PyExc_TypeError, wrmsg);
+	seq = PySequence_Fast(obj, "expected a sequence");
+	len = PySequence_Fast_GET_SIZE(obj);
+	if (!seq || len <= 0) {
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
 
-	if ((len = PyList_GET_SIZE(list)) > SPIDEV_MAXPATH) {
-		PyErr_SetString(PyExc_OverflowError, wrmsg);
+	if (len > SPIDEV_MAXPATH) {
+		snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
+		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
 		return NULL;
 	}
 
@@ -393,7 +423,7 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	rxbuf = malloc(sizeof(__u8) * len);
 
 	for (ii = 0; ii < len; ii++) {
-		PyObject *val = PyList_GET_ITEM(list, ii);
+		PyObject *val = PySequence_Fast_GET_ITEM(seq, ii);
 #if PY_MAJOR_VERSION < 3
 		if (PyInt_Check(val)) {
 			txbuf[ii] = (__u8)PyInt_AS_LONG(val);
@@ -403,12 +433,18 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 			if (PyLong_Check(val)) {
 				txbuf[ii] = (__u8)PyLong_AS_LONG(val);
 			} else {
-				PyErr_SetString(PyExc_TypeError, msg);
+				snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_val, val);
+				PyErr_SetString(PyExc_TypeError, wrmsg_text);
 				free(txbuf);
 				free(rxbuf);
 				return NULL;
 			}
 		}
+	}
+
+	if (PyTuple_Check(obj)) {
+		Py_DECREF(seq);
+		seq = PySequence_List(obj);
 	}
 
 	xfer.tx_buf = (unsigned long)txbuf;
@@ -426,10 +462,9 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
-	list = PyList_New(len);
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
-		PyList_SET_ITEM(list, ii, val);
+		PySequence_SetItem(seq, ii, val);
 	}
 	// WA:
 	// in CS_HIGH mode CS isnt pulled to low after transfer
@@ -441,7 +476,14 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	free(txbuf);
 	free(rxbuf);
 
-	return list;
+
+	if (PyTuple_Check(obj)) {
+		PyObject *old = seq;
+		seq = PySequence_Tuple(seq);
+		Py_DECREF(old);
+	}
+
+	return seq;
 }
 
 static int __spidev_set_mode( int fd, __u8 mode) {
@@ -534,6 +576,20 @@ SpiDev_get_loop(SpiDevObject *self, void *closure)
 
 	Py_INCREF(result);
 	return result;
+}
+
+static PyObject *
+SpiDev_get_no_cs(SpiDevObject *self, void *closure)
+{
+        PyObject *result;
+
+        if (self->mode & SPI_NO_CS)
+                result = Py_True;
+        else
+                result = Py_False;
+
+        Py_INCREF(result);
+        return result;
 }
 
 
@@ -661,6 +717,34 @@ SpiDev_set_3wire(SpiDevObject *self, PyObject *val, void *closure)
 }
 
 static int
+SpiDev_set_no_cs(SpiDevObject *self, PyObject *val, void *closure)
+{
+        uint8_t tmp;
+
+        if (val == NULL) {
+                PyErr_SetString(PyExc_TypeError,
+                        "Cannot delete attribute");
+                return -1;
+        }
+        else if (!PyBool_Check(val)) {
+                PyErr_SetString(PyExc_TypeError,
+                        "The no_cs attribute must be boolean");
+                return -1;
+        }
+
+        if (val == Py_True)
+                tmp = self->mode | SPI_NO_CS;
+        else
+                tmp = self->mode & ~SPI_NO_CS;
+
+        __spidev_set_mode(self->fd, tmp);
+
+        self->mode = tmp;
+        return 0;
+}
+
+
+static int
 SpiDev_set_loop(SpiDevObject *self, PyObject *val, void *closure)
 {
 	uint8_t tmp;
@@ -720,9 +804,9 @@ SpiDev_set_bits_per_word(SpiDevObject *self, PyObject *val, void *closure)
 		}
 	}
 
-        if (bits < 8 || bits > 16) {
+		if (bits < 8 || bits > 16) {
 		PyErr_SetString(PyExc_TypeError,
-                                "invalid bits_per_word (8 to 16)");
+			"invalid bits_per_word (8 to 16)");
 		return -1;
 	}
 
@@ -792,6 +876,8 @@ static PyGetSetDef SpiDev_getset[] = {
 			"LSB first\n"},
 	{"loop", (getter)SpiDev_get_loop, (setter)SpiDev_set_loop,
 			"loopback configuration\n"},
+	{"no_cs", (getter)SpiDev_get_no_cs, (setter)SpiDev_set_no_cs,
+			"disable chip select\n"},
 	{"bits_per_word", (getter)SpiDev_get_bits_per_word, (setter)SpiDev_set_bits_per_word,
 			"bits per word\n"},
 	{"max_speed_hz", (getter)SpiDev_get_max_speed_hz, (setter)SpiDev_set_max_speed_hz,
@@ -869,6 +955,32 @@ PyDoc_STRVAR(SpiDevObjectType_doc,
 	"Return a new SPI object that is (optionally) connected to the\n"
 	"specified SPI device interface.\n");
 
+static
+PyObject *SpiDev_enter(PyObject *self, PyObject *args)
+{
+    if (!PyArg_ParseTuple(args, ""))
+        return NULL;
+
+    Py_INCREF(self);
+    return self;
+}
+
+static
+PyObject *SpiDev_exit(SpiDevObject *self, PyObject *args)
+{
+
+    PyObject *exc_type = 0;
+    PyObject *exc_value = 0;
+    PyObject *traceback = 0;
+    if (!PyArg_UnpackTuple(args, "__exit__", 3, 3, &exc_type, &exc_value,
+                           &traceback)) {
+        return 0;
+    }
+
+    SpiDev_close(self);
+    Py_RETURN_FALSE;
+}
+
 static PyMethodDef SpiDev_methods[] = {
 	{"open", (PyCFunction)SpiDev_open, METH_VARARGS | METH_KEYWORDS,
 		SpiDev_open_doc},
@@ -884,6 +996,10 @@ static PyMethodDef SpiDev_methods[] = {
 		SpiDev_xfer_doc},
 	{"xfer2", (PyCFunction)SpiDev_xfer2, METH_VARARGS,
 		SpiDev_xfer2_doc},
+	{"__enter__", (PyCFunction)SpiDev_enter, METH_VARARGS,
+		NULL},
+	{"__exit__", (PyCFunction)SpiDev_exit, METH_VARARGS,
+		NULL},
 	{NULL},
 };
 
@@ -983,4 +1099,3 @@ void initspidev(void)
 	return m;
 #endif
 }
-

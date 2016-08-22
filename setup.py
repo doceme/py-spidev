@@ -14,7 +14,7 @@ classifiers = ['Development Status :: 5 - Production/Stable',
                'Topic :: System :: Hardware :: Hardware Drivers']
 
 setup(	name		= "spidev",
-	version		= "3.0",
+	version		= "3.2",
 	description	= "Python bindings for Linux SPI access through spidev",
 	long_description= open('README.md').read() + "\n" + open('CHANGELOG.md').read(),
 	author		= "Volker Thoms",
