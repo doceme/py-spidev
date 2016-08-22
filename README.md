@@ -46,7 +46,7 @@ Methods
 
     open(bus, device)
 
-Connects to the specified SPI device, opening /dev/spidev-bus.device
+Connects to the specified SPI device, opening `/dev/spidev<bus>.<device>`
 
     readbytes(n)
 
