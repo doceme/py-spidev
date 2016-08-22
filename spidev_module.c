@@ -27,6 +27,7 @@
 #include <sys/ioctl.h>
 #include <linux/ioctl.h>
 
+#define _VERSION_ "3.3"
 #define SPIDEV_MAXPATH 4096
 
 
@@ -1089,9 +1090,16 @@ void initspidev(void)
 
 #if PY_MAJOR_VERSION >= 3
 	m = PyModule_Create(&moduledef);
+	PyObject *version = PyUnicode_FromString(_VERSION_);
 #else
 	m = Py_InitModule3("spidev", SpiDev_module_methods, SpiDev_module_doc);
+	PyObject *version = PyString_FromString(_VERSION_);
 #endif
+
+	PyObject *dict = PyModule_GetDict(m);
+	PyDict_SetItemString(dict, "__version__", version);
+	Py_DECREF(version);
+
 	Py_INCREF(&SpiDevObjectType);
 	PyModule_AddObject(m, "SpiDev", (PyObject *)&SpiDevObjectType);
 
