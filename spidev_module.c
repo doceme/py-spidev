@@ -27,6 +27,7 @@
 #include <sys/ioctl.h>
 #include <linux/ioctl.h>
 
+#define _VERSION_ "3.3"
 #define SPIDEV_MAXPATH 4096
 
 
@@ -56,7 +57,7 @@ PyDoc_STRVAR(SpiDev_module_doc,
 typedef struct {
 	PyObject_HEAD
 
-	int fd;	/* open file descriptor: /dev/spi-X.Y */
+	int fd;	/* open file descriptor: /dev/spidevX.Y */
 	uint8_t mode;	/* current SPI mode */
 	uint8_t bits_per_word;	/* current SPI bits per word setting */
 	uint32_t max_speed_hz;	/* current SPI max speed setting in Hz */
@@ -888,7 +889,7 @@ static PyGetSetDef SpiDev_getset[] = {
 PyDoc_STRVAR(SpiDev_open_doc,
 	"open(bus, device)\n\n"
 	"Connects the object to the specified SPI device.\n"
-	"open(X,Y) will open /dev/spidev-X.Y\n");
+	"open(X,Y) will open /dev/spidev<X>.<Y>\n");
 
 static PyObject *
 SpiDev_open(SpiDevObject *self, PyObject *args, PyObject *kwds)
@@ -1089,9 +1090,16 @@ void initspidev(void)
 
 #if PY_MAJOR_VERSION >= 3
 	m = PyModule_Create(&moduledef);
+	PyObject *version = PyUnicode_FromString(_VERSION_);
 #else
 	m = Py_InitModule3("spidev", SpiDev_module_methods, SpiDev_module_doc);
+	PyObject *version = PyString_FromString(_VERSION_);
 #endif
+
+	PyObject *dict = PyModule_GetDict(m);
+	PyDict_SetItemString(dict, "__version__", version);
+	Py_DECREF(version);
+
 	Py_INCREF(&SpiDevObjectType);
 	PyModule_AddObject(m, "SpiDev", (PyObject *)&SpiDevObjectType);
 
