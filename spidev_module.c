@@ -400,7 +400,9 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	PyObject *obj;
 	PyObject *seq;
 	struct spi_ioc_transfer xfer;
+	Py_BEGIN_ALLOW_THREADS
 	memset(&xfer, 0, sizeof(xfer));
+	Py_END_ALLOW_THREADS
 	uint8_t *txbuf, *rxbuf;
 	char	wrmsg_text[4096];
 
@@ -420,8 +422,10 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
+	Py_BEGIN_ALLOW_THREADS
 	txbuf = malloc(sizeof(__u8) * len);
 	rxbuf = malloc(sizeof(__u8) * len);
+	Py_END_ALLOW_THREADS
 
 	for (ii = 0; ii < len; ii++) {
 		PyObject *val = PySequence_Fast_GET_ITEM(seq, ii);
@@ -448,6 +452,7 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 		seq = PySequence_List(obj);
 	}
 
+	Py_BEGIN_ALLOW_THREADS
 	xfer.tx_buf = (unsigned long)txbuf;
 	xfer.rx_buf = (unsigned long)rxbuf;
 	xfer.len = len;
@@ -456,6 +461,7 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	xfer.bits_per_word = bits_per_word ? bits_per_word : self->bits_per_word;
 
 	status = ioctl(self->fd, SPI_IOC_MESSAGE(1), &xfer);
+	Py_END_ALLOW_THREADS
 	if (status < 0) {
 		PyErr_SetFromErrno(PyExc_IOError);
 		free(txbuf);
@@ -474,8 +480,10 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	// Stop generating an extra CS except in mode CS_HOGH
 	if (self->mode & SPI_CS_HIGH) status = read(self->fd, &rxbuf[0], 0);
 
+	Py_BEGIN_ALLOW_THREADS
 	free(txbuf);
 	free(rxbuf);
+	Py_END_ALLOW_THREADS
 
 
 	if (PyTuple_Check(obj)) {
