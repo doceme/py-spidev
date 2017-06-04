@@ -304,9 +304,9 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	}
 
 	status = ioctl(self->fd, SPI_IOC_MESSAGE(len), xferptr);
+	free(xferptr);
 	if (status < 0) {
 		PyErr_SetFromErrno(PyExc_IOError);
-		free(xferptr);
 		free(txbuf);
 		free(rxbuf);
 		return NULL;
