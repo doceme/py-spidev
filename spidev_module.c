@@ -813,9 +813,9 @@ SpiDev_set_bits_per_word(SpiDevObject *self, PyObject *val, void *closure)
 		}
 	}
 
-		if (bits < 8 || bits > 16) {
+		if (bits < 8 || bits > 32) {
 		PyErr_SetString(PyExc_TypeError,
-			"invalid bits_per_word (8 to 16)");
+			"invalid bits_per_word (8 to 32)");
 		return -1;
 	}
 
