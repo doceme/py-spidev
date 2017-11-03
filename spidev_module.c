@@ -606,6 +606,7 @@ static int
 SpiDev_set_mode(SpiDevObject *self, PyObject *val, void *closure)
 {
 	uint8_t mode, tmp;
+	int ret;
 
 	if (val == NULL) {
 		PyErr_SetString(PyExc_TypeError,
@@ -638,16 +639,18 @@ SpiDev_set_mode(SpiDevObject *self, PyObject *val, void *closure)
 	// clean and set CPHA and CPOL bits
 	tmp = ( self->mode & ~(SPI_CPHA | SPI_CPOL) ) | mode ;
 
-	__spidev_set_mode(self->fd, tmp);
+	ret = __spidev_set_mode(self->fd, tmp);
 
-	self->mode = tmp;
-	return 0;
+	if (ret != -1)
+		self->mode = tmp;
+	return ret;
 }
 
 static int
 SpiDev_set_cshigh(SpiDevObject *self, PyObject *val, void *closure)
 {
 	uint8_t tmp;
+	int ret;
 
 	if (val == NULL) {
 		PyErr_SetString(PyExc_TypeError,
@@ -665,16 +668,18 @@ SpiDev_set_cshigh(SpiDevObject *self, PyObject *val, void *closure)
 	else
 		tmp = self->mode & ~SPI_CS_HIGH;
 
-	__spidev_set_mode(self->fd, tmp);
+	ret = __spidev_set_mode(self->fd, tmp);
 
-	self->mode = tmp;
-	return 0;
+	if (ret != -1)
+		self->mode = tmp;
+	return ret;
 }
 
 static int
 SpiDev_set_lsbfirst(SpiDevObject *self, PyObject *val, void *closure)
 {
 	uint8_t tmp;
+	int ret;
 
 	if (val == NULL) {
 		PyErr_SetString(PyExc_TypeError,
@@ -692,16 +697,18 @@ SpiDev_set_lsbfirst(SpiDevObject *self, PyObject *val, void *closure)
 	else
 		tmp = self->mode & ~SPI_LSB_FIRST;
 
-	__spidev_set_mode(self->fd, tmp);
+	ret = __spidev_set_mode(self->fd, tmp);
 
-	self->mode = tmp;
-	return 0;
+	if (ret != -1)
+		self->mode = tmp;
+	return ret;
 }
 
 static int
 SpiDev_set_3wire(SpiDevObject *self, PyObject *val, void *closure)
 {
 	uint8_t tmp;
+	int ret;
 
 	if (val == NULL) {
 		PyErr_SetString(PyExc_TypeError,
@@ -719,16 +726,18 @@ SpiDev_set_3wire(SpiDevObject *self, PyObject *val, void *closure)
 	else
 		tmp = self->mode & ~SPI_3WIRE;
 
-	__spidev_set_mode(self->fd, tmp);
+	ret = __spidev_set_mode(self->fd, tmp);
 
-	self->mode = tmp;
-	return 0;
+	if (ret != -1)
+		self->mode = tmp;
+	return ret;
 }
 
 static int
 SpiDev_set_no_cs(SpiDevObject *self, PyObject *val, void *closure)
 {
         uint8_t tmp;
+	int ret;
 
         if (val == NULL) {
                 PyErr_SetString(PyExc_TypeError,
@@ -746,10 +755,11 @@ SpiDev_set_no_cs(SpiDevObject *self, PyObject *val, void *closure)
         else
                 tmp = self->mode & ~SPI_NO_CS;
 
-        __spidev_set_mode(self->fd, tmp);
+        ret = __spidev_set_mode(self->fd, tmp);
 
-        self->mode = tmp;
-        return 0;
+	if (ret != -1)
+		self->mode = tmp;
+        return ret;
 }
 
 
@@ -757,6 +767,7 @@ static int
 SpiDev_set_loop(SpiDevObject *self, PyObject *val, void *closure)
 {
 	uint8_t tmp;
+	int ret;
 
 	if (val == NULL) {
 		PyErr_SetString(PyExc_TypeError,
@@ -774,10 +785,11 @@ SpiDev_set_loop(SpiDevObject *self, PyObject *val, void *closure)
 	else
 		tmp = self->mode & ~SPI_LOOP;
 
-	__spidev_set_mode(self->fd, tmp);
+	ret = __spidev_set_mode(self->fd, tmp);
 
-	self->mode = tmp;
-	return 0;
+	if (ret != -1)
+		self->mode = tmp;
+	return ret;
 }
 
 static PyObject *
