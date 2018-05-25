@@ -151,7 +151,6 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 			if (PyLong_Check(val)) {
 				buf[buf_idx] = (__u8)PyLong_AS_LONG(val);
 			} else {
-				Py_DECREF(val);
 				Py_DECREF(seq);
 				snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_val, val);
 				PyErr_SetString(PyExc_TypeError, wrmsg_text);
@@ -160,7 +159,6 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 		}
 		ii++;
 		buf_idx++;
-		Py_DECREF(val);
 
                 uint16_t buf_idx_offset = 0;
                 if(buf_idx == 4096 || ii == len){
