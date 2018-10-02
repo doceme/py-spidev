@@ -30,6 +30,14 @@
 #define _VERSION_ "3.3"
 #define SPIDEV_MAXPATH 4096
 
+#define BLOCK_SIZE_CONTROL_FILE "/sys/module/spidev/parameters/bufsiz"
+// The xfwr3 function attempts to use large blocks if /sys/module/spidev/parameters/bufsiz setting allows it.
+// However where we cannot get a value from that file, we fall back to this safe default.
+#define XFER3_DEFAULT_BLOCK_SIZE SPIDEV_MAXPATH
+// Largest block size for xfer3 - even if /sys/module/spidev/parameters/bufsiz allows bigger
+// blocks, we won't go above this value. As I understand, DMA is not used for anything bigger so why bother.
+#define XFER3_MAX_BLOCK_SIZE 65535
+
 
 #if PY_MAJOR_VERSION < 3
 #define PyLong_AS_LONG(val) PyInt_AS_LONG(val)
@@ -43,6 +51,40 @@
 #define PyInt_AsLong		PyLong_AsLong
 #define PyInt_Type			PyLong_Type
 #endif
+
+// Maximum block size for xfer3
+// Initialised once by get_xfer3_block_size
+uint32_t xfer3_block_size = 0;
+
+// Read maximum block size from the /sys/module/spidev/parameters/bufsiz
+// In case of any problems reading the number, we fall back to XFER3_DEFAULT_BLOCK_SIZE.
+// If number is read ok but it exceeds the XFER3_MAX_BLOCK_SIZE, it will be capped to that value.
+// The value is read and cached on the first invocation. Following invocations just return the cached one.
+uint32_t get_xfer3_block_size(void) {
+	int value;
+
+	// If value was already initialised, just use it
+	if (xfer3_block_size != 0) {
+		return xfer3_block_size;
+	}
+
+	// Start with the default
+	xfer3_block_size = XFER3_DEFAULT_BLOCK_SIZE;
+
+	FILE *file = fopen(BLOCK_SIZE_CONTROL_FILE,"r");
+	if (file != NULL) {
+		if (fscanf(file, "%d", &value) == 1 && value > 0) {
+			if (value <= XFER3_MAX_BLOCK_SIZE) {
+				xfer3_block_size = value;
+			} else {
+				xfer3_block_size = XFER3_MAX_BLOCK_SIZE;
+			}
+		}
+		fclose(file);
+	}
+
+	return xfer3_block_size;
+}
 
 PyDoc_STRVAR(SpiDev_module_doc,
 	"This module defines an object type that allows SPI transactions\n"
@@ -112,6 +154,8 @@ SpiDev_dealloc(SpiDevObject *self)
 static char *wrmsg_list0 = "Empty argument list.";
 static char *wrmsg_listmax = "Argument list size exceeds %d bytes.";
 static char *wrmsg_val = "Non-Int/Long value in arguments: %x.";
+static char *wrmsg_oom = "Out of memory.";
+
 
 PyDoc_STRVAR(SpiDev_write_doc,
 	"write([values]) -> None\n\n"
@@ -493,6 +537,155 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	}
 
 	return seq;
+}
+
+PyDoc_STRVAR(SpiDev_xfer3_doc,
+	"xfer3([values]) -> [values]\n\n"
+	"Perform SPI transaction. Accepts input of arbitrary size.\n"
+	"Large blocks will be send as multiple transactions\n"
+	"CS will be held active between blocks.\n");
+
+static PyObject *
+SpiDev_xfer3(SpiDevObject *self, PyObject *args)
+{
+	int status;
+	uint16_t delay_usecs = 0;
+	uint32_t speed_hz = 0;
+	uint8_t bits_per_word = 0;
+	Py_ssize_t ii, jj, len, block_size, block_start, bufsize;
+	PyObject *obj;
+	PyObject *seq;
+	PyObject *rx_tuple;
+	struct spi_ioc_transfer xfer;
+	Py_BEGIN_ALLOW_THREADS
+	memset(&xfer, 0, sizeof(xfer));
+	Py_END_ALLOW_THREADS
+	uint8_t *txbuf, *rxbuf;
+	char	wrmsg_text[4096];
+
+	if (!PyArg_ParseTuple(args, "O|IHB:xfer3", &obj, &speed_hz, &delay_usecs, &bits_per_word))
+		return NULL;
+
+	seq = PySequence_Fast(obj, "expected a sequence");
+	if (!seq) {
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
+		return NULL;
+	}
+
+	len = PySequence_Fast_GET_SIZE(seq);
+	if (len <= 0) {
+		Py_DECREF(seq);
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
+		return NULL;
+	}
+
+	bufsize = get_xfer3_block_size();
+	if (bufsize > len) {
+		bufsize = len;
+	}
+
+	rx_tuple = PyTuple_New(len);
+	if (!rx_tuple) {
+		Py_DECREF(seq);
+		PyErr_SetString(PyExc_OverflowError, wrmsg_oom);
+		return NULL;
+	}
+
+	Py_BEGIN_ALLOW_THREADS
+	// Allocate tx and rx buffers immediately releasing them if any allocation fails
+	if ((txbuf = malloc(sizeof(__u8) * bufsize)) != NULL) {
+		if ((rxbuf = malloc(sizeof(__u8) * bufsize)) != NULL) {
+			// All good, both buffers allocated
+		} else {
+			// rxbuf allocation failed while txbuf succeeded
+			free(txbuf);
+			txbuf = NULL;
+		}
+	} else {
+		// txbuf allocation failed
+		rxbuf = NULL;
+	}
+	Py_END_ALLOW_THREADS
+
+	if (!txbuf || !rxbuf) {
+		// Allocation failed. Buffers has been freed already
+		Py_DECREF(seq);
+		Py_DECREF(rx_tuple);
+		PyErr_SetString(PyExc_OverflowError, wrmsg_oom);
+		return NULL;
+	}
+
+
+	block_start = 0;
+	while (block_start < len) {
+
+		for (ii = 0, jj = block_start; jj < len && ii < bufsize; ii++, jj++) {
+			PyObject *val = PySequence_Fast_GET_ITEM(seq, jj);
+#if PY_MAJOR_VERSION < 3
+			if (PyInt_Check(val)) {
+				txbuf[ii] = (__u8)PyInt_AS_LONG(val);
+			} else
+#endif
+			{
+				if (PyLong_Check(val)) {
+					txbuf[ii] = (__u8)PyLong_AS_LONG(val);
+				} else {
+					snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_val, val);
+					PyErr_SetString(PyExc_TypeError, wrmsg_text);
+					free(txbuf);
+					free(rxbuf);
+					Py_DECREF(rx_tuple);
+					Py_DECREF(seq);
+					return NULL;
+				}
+			}
+		}
+
+		block_size = ii;
+
+		Py_BEGIN_ALLOW_THREADS
+		xfer.tx_buf = (unsigned long)txbuf;
+		xfer.rx_buf = (unsigned long)rxbuf;
+		xfer.len = block_size;
+		xfer.delay_usecs = delay_usecs;
+		xfer.speed_hz = speed_hz ? speed_hz : self->max_speed_hz;
+		xfer.bits_per_word = bits_per_word ? bits_per_word : self->bits_per_word;
+
+		status = ioctl(self->fd, SPI_IOC_MESSAGE(1), &xfer);
+		Py_END_ALLOW_THREADS
+		if (status < 0) {
+			PyErr_SetFromErrno(PyExc_IOError);
+			free(txbuf);
+			free(rxbuf);
+			Py_DECREF(rx_tuple);
+			Py_DECREF(seq);
+			return NULL;
+		}
+
+		for (ii = 0, jj = block_start; ii < block_size; ii++, jj++) {
+			PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
+			PyTuple_SetItem(rx_tuple, jj, val);
+		}
+
+		block_start += block_size;
+	}
+
+
+	// WA:
+	// in CS_HIGH mode CS isnt pulled to low after transfer
+	// reading 0 bytes doesn't really matter but brings CS down
+	// tomdean:
+	// Stop generating an extra CS except in mode CS_HIGH
+	if (self->mode & SPI_CS_HIGH) status = read(self->fd, &rxbuf[0], 0);
+
+	Py_BEGIN_ALLOW_THREADS
+	free(txbuf);
+	free(rxbuf);
+	Py_END_ALLOW_THREADS
+
+	Py_DECREF(seq);
+
+	return rx_tuple;
 }
 
 static int __spidev_set_mode( int fd, __u8 mode) {
@@ -1005,6 +1198,8 @@ static PyMethodDef SpiDev_methods[] = {
 		SpiDev_xfer_doc},
 	{"xfer2", (PyCFunction)SpiDev_xfer2, METH_VARARGS,
 		SpiDev_xfer2_doc},
+	{"xfer3", (PyCFunction)SpiDev_xfer3, METH_VARARGS,
+		SpiDev_xfer3_doc},
 	{"__enter__", (PyCFunction)SpiDev_enter, METH_VARARGS,
 		NULL},
 	{"__exit__", (PyCFunction)SpiDev_exit, METH_VARARGS,

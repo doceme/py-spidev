@@ -65,6 +65,12 @@ Delay specifies the delay in usec between blocks.
 
 Performs an SPI transaction. Chip-select should be held active between blocks.
 
+    xfer3(list of values[, speed_hz, delay_usec, bits_per_word])
+
+Similar to `xfer2` but accepts arbitrary large lists.
+If list size exceeds buffer size (which is read from `/sys/module/spidev/parameters/bufsiz`),
+data will be split into smaller chunks and sent in multiple operations.
+
     close()
 
 Disconnects from the SPI device.
