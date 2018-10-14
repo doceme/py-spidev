@@ -266,6 +266,180 @@ SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 	return list;
 }
 
+static PyObject *
+SpiDev_writebytes2_buffer(SpiDevObject *self, Py_buffer *buffer)
+{
+	int		status;
+	Py_ssize_t	remain, block_size, block_start, spi_max_block;
+
+	spi_max_block = get_xfer3_block_size();
+
+	block_start = 0;
+	remain = buffer->len;
+	while (block_start < buffer->len) {
+		block_size = (remain < spi_max_block) ? remain : spi_max_block;
+
+		Py_BEGIN_ALLOW_THREADS
+		status = write(self->fd, buffer->buf + block_start, block_size);
+		Py_END_ALLOW_THREADS
+
+		if (status < 0) {
+			PyErr_SetFromErrno(PyExc_IOError);
+			return NULL;
+		}
+
+		if (status != block_size) {
+			perror("short write");
+			return NULL;
+		}
+
+		block_start += block_size;
+		remain -= block_size;
+	}
+
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static PyObject *
+SpiDev_writebytes2_seq_internal(SpiDevObject *self, PyObject *seq, Py_ssize_t len, uint8_t *buf, Py_ssize_t bufsize)
+{
+	int		status;
+	Py_ssize_t	ii, jj, remain, block_size;
+	char	wrmsg_text[4096];
+
+	remain = len;
+	jj = 0;
+	while (remain > 0) {
+		block_size = (remain < bufsize) ? remain : bufsize;
+
+		for (ii = 0; ii < block_size; ii++, jj++) {
+			PyObject *val = PySequence_Fast_GET_ITEM(seq, jj);
+#if PY_MAJOR_VERSION < 3
+			if (PyInt_Check(val)) {
+				buf[ii] = (__u8)PyInt_AS_LONG(val);
+			} else
+#endif
+			{
+				if (PyLong_Check(val)) {
+					buf[ii] = (__u8)PyLong_AS_LONG(val);
+				} else {
+					snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_val, val);
+					PyErr_SetString(PyExc_TypeError, wrmsg_text);
+					return NULL;
+				}
+			}
+		}
+
+		Py_BEGIN_ALLOW_THREADS
+		status = write(self->fd, buf, block_size);
+		Py_END_ALLOW_THREADS
+
+		if (status < 0) {
+			PyErr_SetFromErrno(PyExc_IOError);
+			return NULL;
+		}
+
+		if (status != block_size) {
+			perror("short write");
+			return NULL;
+		}
+
+		remain -= block_size;
+	}
+
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+// In writebytes2 we try to avoild doing malloc/free on each tiny block.
+// So for any transfer below this size we will use on-stack local buffer instead of allocating one on the heap.
+#define SMALL_BUFFER_SIZE 128
+
+static PyObject *
+SpiDev_writebytes2_seq(SpiDevObject *self, PyObject *seq)
+{
+	Py_ssize_t	len, bufsize, spi_max_block;
+	PyObject	*result = NULL;
+
+	len = PySequence_Fast_GET_SIZE(seq);
+	if (len <= 0) {
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
+		return NULL;
+	}
+
+	spi_max_block = get_xfer3_block_size();
+
+	bufsize = (len < spi_max_block) ? len : spi_max_block;
+
+	if (bufsize <= SMALL_BUFFER_SIZE) {
+		// The data size is very small so we can avoid malloc/free completely
+		// by using a small local buffer instead
+		uint8_t buf[SMALL_BUFFER_SIZE];
+		result = SpiDev_writebytes2_seq_internal(self, seq, len, buf, SMALL_BUFFER_SIZE);
+	} else {
+		// Large data, need to allocate buffer on heap
+		uint8_t	*buf;
+		Py_BEGIN_ALLOW_THREADS
+		buf = malloc(sizeof(__u8) * bufsize);
+		Py_END_ALLOW_THREADS
+
+		if (!buf) {
+			PyErr_SetString(PyExc_OverflowError, wrmsg_oom);
+			return NULL;
+		}
+
+		result = SpiDev_writebytes2_seq_internal(self, seq, len, buf, bufsize);
+
+		Py_BEGIN_ALLOW_THREADS
+		free(buf);
+		Py_END_ALLOW_THREADS
+	}
+
+	return result;
+}
+
+PyDoc_STRVAR(SpiDev_writebytes2_doc,
+	"writebytes2([values]) -> None\n\n"
+	"Write bytes to SPI device.\n"
+	"values must be a list or buffer.\n");
+
+static PyObject *
+SpiDev_writebytes2(SpiDevObject *self, PyObject *args)
+{
+	PyObject	*obj, *seq;;
+	PyObject	*result = NULL;
+
+	if (!PyArg_ParseTuple(args, "O:writebytes2", &obj)) {
+		return NULL;
+	}
+
+	// Try using buffer protocol if object supports it.
+	if (PyObject_CheckBuffer(obj) && 1) {
+		Py_buffer	buffer;
+		if (PyObject_GetBuffer(obj, &buffer, PyBUF_SIMPLE) != -1) {
+			result = SpiDev_writebytes2_buffer(self, &buffer);
+			PyBuffer_Release(&buffer);
+			return result;
+		}
+	}
+
+
+	// Otherwise, fall back to sequence protocol
+	seq = PySequence_Fast(obj, "expected a sequence");
+	if (seq == NULL) {
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
+		return NULL;
+	}
+
+	result = SpiDev_writebytes2_seq(self, seq);
+
+	Py_DECREF(seq);
+
+	return result;
+
+}
+
 PyDoc_STRVAR(SpiDev_xfer_doc,
 	"xfer([values]) -> [values]\n\n"
 	"Perform SPI transaction.\n"
@@ -606,7 +780,6 @@ SpiDev_xfer3(SpiDevObject *self, PyObject *args)
 		rxbuf = NULL;
 	}
 	Py_END_ALLOW_THREADS
-
 	if (!txbuf || !rxbuf) {
 		// Allocation failed. Buffers has been freed already
 		Py_DECREF(seq);
@@ -653,6 +826,7 @@ SpiDev_xfer3(SpiDevObject *self, PyObject *args)
 
 		status = ioctl(self->fd, SPI_IOC_MESSAGE(1), &xfer);
 		Py_END_ALLOW_THREADS
+
 		if (status < 0) {
 			PyErr_SetFromErrno(PyExc_IOError);
 			free(txbuf);
@@ -661,7 +835,6 @@ SpiDev_xfer3(SpiDevObject *self, PyObject *args)
 			Py_DECREF(seq);
 			return NULL;
 		}
-
 		for (ii = 0, jj = block_start; ii < block_size; ii++, jj++) {
 			PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
 			PyTuple_SetItem(rx_tuple, jj, val);
@@ -1194,6 +1367,8 @@ static PyMethodDef SpiDev_methods[] = {
 		SpiDev_read_doc},
 	{"writebytes", (PyCFunction)SpiDev_writebytes, METH_VARARGS,
 		SpiDev_write_doc},
+	{"writebytes2", (PyCFunction)SpiDev_writebytes2, METH_VARARGS,
+		SpiDev_writebytes2_doc},
 	{"xfer", (PyCFunction)SpiDev_xfer, METH_VARARGS,
 		SpiDev_xfer_doc},
 	{"xfer2", (PyCFunction)SpiDev_xfer2, METH_VARARGS,

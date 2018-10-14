@@ -56,6 +56,16 @@ Read n bytes from SPI device.
 
 Writes a list of values to SPI device.
 
+    writebytes2(list of values)
+
+Similar to `writebytes` but accepts arbitrary large lists.
+If list size exceeds buffer size (which is read from `/sys/module/spidev/parameters/bufsiz`),
+data will be split into smaller chunks and sent in multiple operations.
+
+Also, `writebytes2` understands [buffer protocol](https://docs.python.org/3/c-api/buffer.html)
+so it can accept numpy byte arrays for example without need to convert them with `tolist()` first.
+This offers much better performance where you need to transfer frames to SPI-connected displays for instance.
+
     xfer(list of values[, speed_hz, delay_usec, bits_per_word])
 
 Performs an SPI transaction. Chip-select should be released and reactivated between blocks.
