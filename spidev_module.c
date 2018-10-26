@@ -27,7 +27,7 @@
 #include <sys/ioctl.h>
 #include <linux/ioctl.h>
 
-#define _VERSION_ "3.3"
+#define _VERSION_ "3.4_ek"
 #define SPIDEV_MAXPATH 4096
 
 #define BLOCK_SIZE_CONTROL_FILE "/sys/module/spidev/parameters/bufsiz"
@@ -165,7 +165,7 @@ static PyObject *
 SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 {
 	int		status;
-	uint16_t	ii, len;
+	uint32_t	ii, len;
 	uint8_t	buf[SPIDEV_MAXPATH];
 	PyObject	*obj;
 	PyObject	*seq;
@@ -181,44 +181,50 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
-	if (len > SPIDEV_MAXPATH) {
-		snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
-		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
-		return NULL;
-	}
-
-	for (ii = 0; ii < len; ii++) {
+	//write the sequence out 4kb at a time (to work with arbitrary sequences, with a fixed write buffer), till the entire sequence is done
+        uint16_t buf_idx = 0;
+        ii=0;
+	while(1){  //we'll exit at the end of the loop, after the final write
 		PyObject *val = PySequence_Fast_GET_ITEM(seq, ii);
 #if PY_MAJOR_VERSION < 3
 		if (PyInt_Check(val)) {
-			buf[ii] = (__u8)PyInt_AS_LONG(val);
+			buf[buf_idx] = (__u8)PyInt_AS_LONG(val);
 		} else
 #endif
 		{
 			if (PyLong_Check(val)) {
-				buf[ii] = (__u8)PyLong_AS_LONG(val);
+				buf[buf_idx] = (__u8)PyLong_AS_LONG(val);
 			} else {
+				Py_DECREF(seq);
 				snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_val, val);
 				PyErr_SetString(PyExc_TypeError, wrmsg_text);
 				return NULL;
 			}
 		}
-	}
+		ii++;
+		buf_idx++;
 
+                uint16_t buf_idx_offset = 0;
+                if(buf_idx == 4096 || ii == len){
+	        	while( buf_idx_offset < buf_idx && (status = write(self->fd, &buf[buf_idx_offset], buf_idx-buf_idx_offset)) >=0){
+				//update the offset based upon how much we wrote		
+				buf_idx_offset+=status;
+			}
+			if (status < 0) {
+				Py_DECREF(seq);
+				PyErr_SetFromErrno(PyExc_IOError);
+				return NULL;
+			}
+			buf_idx=0; //block is done, reset
+
+			if(ii == len){
+				break;
+			}
+                }
+                    
+	}
+        
 	Py_DECREF(seq);
-
-	status = write(self->fd, &buf[0], len);
-
-	if (status < 0) {
-		PyErr_SetFromErrno(PyExc_IOError);
-		return NULL;
-	}
-
-	if (status != len) {
-		perror("short write");
-		return NULL;
-	}
-
 	Py_INCREF(Py_None);
 	return Py_None;
 }
