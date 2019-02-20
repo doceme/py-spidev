@@ -266,6 +266,44 @@ SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 	return list;
 }
 
+PyDoc_STRVAR(SpiDev_readb_doc,
+             "read(len) -> [values]\n\n"
+             "Read len bytes from SPI device.\n");
+
+static PyObject *
+SpiDev_readbytesb(SpiDevObject *self, PyObject *args)
+{
+    uint8_t	rxbuf[SPIDEV_MAXPATH];
+    int		status, len;
+    PyObject	*bytes;
+    
+    if (!PyArg_ParseTuple(args, "i:read", &len))
+        return NULL;
+    
+    /* read at least 1 byte, no more than SPIDEV_MAXPATH */
+    if (len < 1)
+        len = 1;
+    else if ((unsigned)len > sizeof(rxbuf))
+        len = sizeof(rxbuf);
+    
+    memset(rxbuf, 0, sizeof rxbuf);
+    status = read(self->fd, &rxbuf[0], len);
+    
+    if (status < 0) {
+        PyErr_SetFromErrno(PyExc_IOError);
+        return NULL;
+    }
+    
+    if (status != len) {
+        perror("short read");
+        return NULL;
+    }
+    
+    bytes = Py_BuildValue("y#", rxbuf, len);
+    return bytes;
+}
+
+
 static PyObject *
 SpiDev_writebytes2_buffer(SpiDevObject *self, Py_buffer *buffer)
 {
@@ -1365,6 +1403,8 @@ static PyMethodDef SpiDev_methods[] = {
 		SpiDev_fileno_doc},
 	{"readbytes", (PyCFunction)SpiDev_readbytes, METH_VARARGS,
 		SpiDev_read_doc},
+	{"readbytesb", (PyCFunction)SpiDev_readbytesb, METH_VARARGS,
+		SpiDev_readb_doc},
 	{"writebytes", (PyCFunction)SpiDev_writebytes, METH_VARARGS,
 		SpiDev_write_doc},
 	{"writebytes2", (PyCFunction)SpiDev_writebytes2, METH_VARARGS,
