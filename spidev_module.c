@@ -223,16 +223,12 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 	return Py_None;
 }
 
-PyDoc_STRVAR(SpiDev_read_doc,
-	"read(len) -> [values]\n\n"
-	"Read len bytes from SPI device.\n");
 
 static PyObject *
-SpiDev_readbytes(SpiDevObject *self, PyObject *args)
+SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
 {
 	uint8_t	rxbuf[SPIDEV_MAXPATH];
-	int		status, len, ii;
-	PyObject	*list;
+	int		status, len;
 
 	if (!PyArg_ParseTuple(args, "i:read", &len))
 		return NULL;
@@ -256,51 +252,45 @@ SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
-	list = PyList_New(len);
+	if (resultType == 0) { // list
+    	int ii;
+	    PyObject	*list;
+	    list = PyList_New(len);
 
-	for (ii = 0; ii < len; ii++) {
-		PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
-		PyList_SET_ITEM(list, ii, val);
-	}
+        for (ii = 0; ii < len; ii++) {
+            PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
+            PyList_SET_ITEM(list, ii, val);
+        }
 
-	return list;
+        return list;
+    }
+    else { // bytes
+        PyObject	*bytes;
+        bytes = Py_BuildValue("y#", rxbuf, len);
+
+        return bytes;
+    }
+}
+
+
+PyDoc_STRVAR(SpiDev_read_doc,
+	"read(len) -> [values]\n\n"
+	"Read len bytes from SPI device, returning a list.\n");
+
+static PyObject *
+SpiDev_readbytes(SpiDevObject *self, PyObject *args)
+{
+    return SpiDev_readbytes_generic(self, args, 0);
 }
 
 PyDoc_STRVAR(SpiDev_readb_doc,
              "read(len) -> [values]\n\n"
-             "Read len bytes from SPI device.\n");
+             "Read len bytes from SPI device, returning a bytes object.\n");
 
 static PyObject *
 SpiDev_readbytesb(SpiDevObject *self, PyObject *args)
 {
-    uint8_t	rxbuf[SPIDEV_MAXPATH];
-    int		status, len;
-    PyObject	*bytes;
-    
-    if (!PyArg_ParseTuple(args, "i:read", &len))
-        return NULL;
-    
-    /* read at least 1 byte, no more than SPIDEV_MAXPATH */
-    if (len < 1)
-        len = 1;
-    else if ((unsigned)len > sizeof(rxbuf))
-        len = sizeof(rxbuf);
-    
-    memset(rxbuf, 0, sizeof rxbuf);
-    status = read(self->fd, &rxbuf[0], len);
-    
-    if (status < 0) {
-        PyErr_SetFromErrno(PyExc_IOError);
-        return NULL;
-    }
-    
-    if (status != len) {
-        perror("short read");
-        return NULL;
-    }
-    
-    bytes = Py_BuildValue("y#", rxbuf, len);
-    return bytes;
+    return SpiDev_readbytes_generic(self, args, 1);
 }
 
 
