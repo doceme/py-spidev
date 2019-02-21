@@ -889,6 +889,50 @@ SpiDev_xfer3(SpiDevObject *self, PyObject *args)
 	return rx_tuple;
 }
 
+PyDoc_STRVAR(SpiDev_bidibuffer_doc, "bidibuffer(buffer) -> buffer\njust a test for now\n");
+static PyObject * SpiDev_bidibuffer(PyObject* self, PyObject* args)
+{
+	//if (!PyArg_ParseTuple(args, "O|IHB:xfer", &obj, &speed_hz, &delay_usecs, &bits_per_word))
+
+    //char *buf;
+    Py_buffer pybuf;
+    Py_ssize_t count;
+    //PyObject * result;
+    int i;
+    int val = 100;
+
+    if (!PyArg_ParseTuple(args, "y*|i", &pybuf, &val))
+    {
+        return NULL;
+    }
+    if (!PyBuffer_IsContiguous(&pybuf, 'A'))
+    {
+        PyErr_SetString(PyExc_RuntimeError, "SpiDev.bidibuffer: buffer is not contiguous");
+        return NULL;
+    }
+    count = pybuf.len;
+    printf("count: %d, buff: %lx, val: %d\n", pybuf.len, (unsigned long)pybuf.buf, val);
+    char* buf = pybuf.buf;
+
+    for(i=0;i<count;i++)
+    {
+        printf("%d ", buf[i]);
+        buf[i] = buf[i]+val;
+    }
+    printf("\n");
+
+//    Py_INCREF(args);
+
+    //result = Py_BuildValue("s#", buf, count);
+    //free(buf);
+    Py_RETURN_NONE; //result;
+}
+
+
+
+
+
+
 static int __spidev_set_mode( int fd, __u8 mode) {
 	__u8 test;
 	if (ioctl(fd, SPI_IOC_WR_MODE, &mode) == -1) {
@@ -1405,6 +1449,7 @@ static PyMethodDef SpiDev_methods[] = {
 		SpiDev_xfer2_doc},
 	{"xfer3", (PyCFunction)SpiDev_xfer3, METH_VARARGS,
 		SpiDev_xfer3_doc},
+	{"bidi", (PyCFunction)SpiDev_bidibuffer, METH_VARARGS, SpiDev_bidibuffer_doc},
 	{"__enter__", (PyCFunction)SpiDev_enter, METH_VARARGS,
 		NULL},
 	{"__exit__", (PyCFunction)SpiDev_exit, METH_VARARGS,
