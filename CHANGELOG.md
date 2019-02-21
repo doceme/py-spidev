@@ -1,6 +1,11 @@
 Changelog
 ---------
 
+3.4
+=====
+
+* Changed license to MIT
+
 3.0.1
 =====
 
