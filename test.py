@@ -1,44 +1,31 @@
 import sys
 sys.path = ['.'] + sys.path
-import spidev as spidev
 
-spi = spidev.SpiDev()
-spi.open(0,0)
-print(spi.readbytes(10))
-b = spi.readbytesb(10)
-print(type(b), len(b))
-print(b)
-b = spi.xfer2(bytes(range(10)))
-print(type(b), len(b))
-print(b)
-
-b = bytearray(range(10))
-print (b)
-spi.bidi (b, 1)
-print (b)
-spi.bidi (b)
-print (b)
-
+# https://pypi.org/project/spidev/
+import spidev
 import numpy
-b = bytearray(range(48))
-nlinear = numpy.frombuffer(b, dtype=numpy.uint16)
-n64 = numpy.reshape(nlinear, (6, 4))
-n38 = numpy.reshape(nlinear, (3, 8))
-print(nlinear.view(numpy.uint8))
-print(n64)
-#b[0] = 1;
-#print(n2)
-spi.bidi(n38[0,:], 1)
-spi.bidi(n38[1,:], 50)
-spi.bidi(n38[2,:], 100)
-print(n64)
-print(nlinear.view(numpy.uint8))
-print(b)
+import timeit
+class testspi (object):
+    def __init__(self):
+        spi=spidev.SpiDev()
+        spi.open(0, 0)
+        print("devspi readbytes", spi.readbytes(50))
+        spibytes = spi.readbytesb(50)
+        npbytes = numpy.frombuffer(spibytes, dtype=numpy.int16)
+        print("devspi readbytesb", npbytes)
+        bytes = 1000
+        buffer = bytearray(1000)
+        count = 1000
+        def read(): spi.readbytes(bytes)
+        def readb(): spi.readbytesb(bytes)
+        def readbuffer(): spi.readbuffer(buffer)
+        duration = timeit.timeit(read, number=count)
+        print('list: total dur %f; secs/byte=%f; bytes/sec=%f' % (duration, duration/(bytes*count), (bytes*count)/duration))
+        duration = timeit.timeit(readb, number=count)
+        print('bytes: total dur %f; secs/byte=%f; bytes/sec=%f' % (duration, duration/(bytes*count), (bytes*count)/duration))
+        duration = timeit.timeit(readbuffer, number=count)
+        print('bytes: total dur %f; secs/byte=%f; bytes/sec=%f' % (duration, duration/(bytes*count), (bytes*count)/duration))
+        spi.close()
 
-# print(n)
-# b = bytearray(n[:8])
-# print(b)
-# spi.bidi(b, 1)
-# print(n)
 
-
+testspi()

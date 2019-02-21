@@ -227,19 +227,37 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 static PyObject *
 SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
 {
-	uint8_t	rxbuf[SPIDEV_MAXPATH];
+    static uint8_t stackbuf[SPIDEV_MAXPATH];
 	int		status, len;
+	Py_buffer pybuff;
+	uint8_t* rxbuf = stackbuf;
 
-	if (!PyArg_ParseTuple(args, "i:read", &len))
-		return NULL;
+    if (resultType == 2) { //existing bytearray
+        if (!PyArg_ParseTuple(args, "y*", &pybuff))
+            return NULL;
+        if (!PyBuffer_IsContiguous(&pybuff, 'A')) {
+            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must be contiguous");
+            return NULL;
+        }
+        len = pybuff.len;
+        rxbuf = pybuff.buf;
+        if (len < 1) {
+            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must not be empty");
+            return NULL;
+        }
+    }
+    else {
+    	if (!PyArg_ParseTuple(args, "i:read", &len))
+	    	return NULL;
 
-	/* read at least 1 byte, no more than SPIDEV_MAXPATH */
-	if (len < 1)
-		len = 1;
-	else if ((unsigned)len > sizeof(rxbuf))
-		len = sizeof(rxbuf);
+        /* read at least 1 byte, no more than SPIDEV_MAXPATH */
+        if (len < 1)
+            len = 1;
+        else if ((unsigned)len > sizeof(stackbuf))
+            len = sizeof(stackbuf);
+    	memset(rxbuf, 0, sizeof(stackbuf));
+    }
 
-	memset(rxbuf, 0, sizeof rxbuf);
 	status = read(self->fd, &rxbuf[0], len);
 
 	if (status < 0) {
@@ -248,7 +266,8 @@ SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
 	}
 
 	if (status != len) {
-		perror("short read");
+		printf("Short Read: %d/%d bytes\n", status, len);
+        PyErr_SetString(PyExc_IOError, "SpiDev.readbuffer: I/O error: short read.");
 		return NULL;
 	}
 
@@ -264,11 +283,17 @@ SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
 
         return list;
     }
-    else { // bytes
+    else if (resultType == 1) { // bytes
         PyObject	*bytes;
         bytes = Py_BuildValue("y#", rxbuf, len);
-
         return bytes;
+    }
+    else if (resultType == 2) { // bytearray
+        Py_RETURN_NONE;
+    }
+    else { // unknown type
+        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: internal problem.  Type was not 0, 1 or 2.  Weird.");
+        return NULL;
     }
 }
 
@@ -291,6 +316,16 @@ static PyObject *
 SpiDev_readbytesb(SpiDevObject *self, PyObject *args)
 {
     return SpiDev_readbytes_generic(self, args, 1);
+}
+
+PyDoc_STRVAR(SpiDev_readbuffer_doc,
+             "read(bytearray) -> [values]\n\n"
+             "Read bytes from SPI device, filling the supplied byte array.\n");
+
+static PyObject *
+SpiDev_readbuffer(SpiDevObject *self, PyObject *args)
+{
+    return SpiDev_readbytes_generic(self, args, 2);
 }
 
 
@@ -889,49 +924,6 @@ SpiDev_xfer3(SpiDevObject *self, PyObject *args)
 	return rx_tuple;
 }
 
-PyDoc_STRVAR(SpiDev_bidibuffer_doc, "bidibuffer(buffer) -> buffer\njust a test for now\n");
-static PyObject * SpiDev_bidibuffer(PyObject* self, PyObject* args)
-{
-	//if (!PyArg_ParseTuple(args, "O|IHB:xfer", &obj, &speed_hz, &delay_usecs, &bits_per_word))
-
-    //char *buf;
-    Py_buffer pybuf;
-    Py_ssize_t count;
-    //PyObject * result;
-    int i;
-    int val = 100;
-
-    if (!PyArg_ParseTuple(args, "y*|i", &pybuf, &val))
-    {
-        return NULL;
-    }
-    if (!PyBuffer_IsContiguous(&pybuf, 'A'))
-    {
-        PyErr_SetString(PyExc_RuntimeError, "SpiDev.bidibuffer: buffer is not contiguous");
-        return NULL;
-    }
-    count = pybuf.len;
-    printf("count: %d, buff: %lx, val: %d\n", pybuf.len, (unsigned long)pybuf.buf, val);
-    char* buf = pybuf.buf;
-
-    for(i=0;i<count;i++)
-    {
-        printf("%d ", buf[i]);
-        buf[i] = buf[i]+val;
-    }
-    printf("\n");
-
-//    Py_INCREF(args);
-
-    //result = Py_BuildValue("s#", buf, count);
-    //free(buf);
-    Py_RETURN_NONE; //result;
-}
-
-
-
-
-
 
 static int __spidev_set_mode( int fd, __u8 mode) {
 	__u8 test;
@@ -1449,7 +1441,7 @@ static PyMethodDef SpiDev_methods[] = {
 		SpiDev_xfer2_doc},
 	{"xfer3", (PyCFunction)SpiDev_xfer3, METH_VARARGS,
 		SpiDev_xfer3_doc},
-	{"bidi", (PyCFunction)SpiDev_bidibuffer, METH_VARARGS, SpiDev_bidibuffer_doc},
+	{"readbuffer", (PyCFunction)SpiDev_readbuffer, METH_VARARGS, SpiDev_readbuffer_doc},
 	{"__enter__", (PyCFunction)SpiDev_enter, METH_VARARGS,
 		NULL},
 	{"__exit__", (PyCFunction)SpiDev_exit, METH_VARARGS,
