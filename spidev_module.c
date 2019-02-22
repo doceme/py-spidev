@@ -237,12 +237,7 @@ SpiDev_read_lowlevel(SpiDevObject *self, uint8_t *buf, int buflen, int lenreq)
         lenreq = buflen;
     memset(buf, 0, buflen);
 
-//#define SPIDEV_READ_LOWLEVEL_TESTING
-#ifdef SPIDEV_READ_LOWLEVEL_TESTING
-    { status = lenreq; for (unsigned i = 0; i < lenreq; i++) buf[i] = 64 + i; }
-#else
 	status = read(self->fd, &buf[0], lenreq);
-#endif
 
 	if (status < 0) {
 		PyErr_SetFromErrno(PyExc_IOError);
@@ -298,8 +293,6 @@ SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
     }
 }
 
-
-
 PyDoc_STRVAR(SpiDev_read_doc,
 	"read(len) -> [values]\n\n"
 	"Read len bytes from SPI device, returning a list.\n");
@@ -318,49 +311,6 @@ static PyObject *
 SpiDev_readbytesb(SpiDevObject *self, PyObject *args)
 {
     return SpiDev_readbytes_generic(self, args, READBYTES_GENERIC_RESULTTYPE_BYTES);
-}
-
-
-PyDoc_STRVAR(SpiDev_readbuffer_doc,
-             "read(bytearray [, length [, offset]]) -> [values]\n\n"
-             "Read bytes from SPI device, filling the supplied byte array.\n");
-
-static PyObject *
-SpiDev_readbuffer(SpiDevObject *self, PyObject *args)
-{
-	Py_buffer pybuff;
-    int offset = 0, len = 0;
-
-    if (!PyArg_ParseTuple(args, "y*|II", &pybuff, &len, &offset))
-        return NULL;
-    if (!PyBuffer_IsContiguous(&pybuff, 'A')) {
-        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must be contiguous.");
-        return NULL;
-    }
-    if (pybuff.len < 1) {
-        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must not be empty.");
-        return NULL;
-    }
-    if (len < 0) {
-        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: length must be positive.");
-        return NULL;
-    }
-    if (offset < 0 || offset >= pybuff.len - 1) { // NB must be space for at least one byte
-        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: offset out of range.");
-        return NULL;
-    }
-    if (offset + len > pybuff.len) {
-        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: offset+length would overflow buffer.");
-        return NULL;
-    }
-
-    if (len == 0)
-        len = pybuff.len - offset;
-
-    if (!SpiDev_read_lowlevel(self, pybuff.buf + offset, len, len))
-        return NULL;
-
-    Py_RETURN_NONE;
 }
 
 
@@ -1476,7 +1426,6 @@ static PyMethodDef SpiDev_methods[] = {
 		SpiDev_xfer2_doc},
 	{"xfer3", (PyCFunction)SpiDev_xfer3, METH_VARARGS,
 		SpiDev_xfer3_doc},
-	{"readbuffer", (PyCFunction)SpiDev_readbuffer, METH_VARARGS, SpiDev_readbuffer_doc},
 	{"__enter__", (PyCFunction)SpiDev_enter, METH_VARARGS,
 		NULL},
 	{"__exit__", (PyCFunction)SpiDev_exit, METH_VARARGS,
