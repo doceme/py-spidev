@@ -28,4 +28,21 @@ class testspi (object):
         spi.close()
 
 
-testspi()
+    def buffertests(self):
+        spi=spidev.SpiDev()
+        spi.open(0, 0)
+        buffer = bytearray(range(20))
+        print(buffer)
+        spi.readbuffer(buffer, 5)
+        print(buffer)
+        spi.readbuffer(buffer, 5, 10)
+        print(buffer)
+        spi.readbuffer(buffer, 0, 15)
+        print(buffer)
+
+        buffer = bytearray(range(20))
+        print(buffer)
+        spi.readbuffer(buffer)
+        print(buffer)
+
+testspi().buffertests()

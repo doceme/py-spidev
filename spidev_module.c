@@ -228,23 +228,37 @@ static PyObject *
 SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
 {
     static uint8_t stackbuf[SPIDEV_MAXPATH];
-	int		status, len;
+	int		status, len = 0;
 	Py_buffer pybuff;
 	uint8_t* rxbuf = stackbuf;
 
     if (resultType == 2) { //existing bytearray
-        if (!PyArg_ParseTuple(args, "y*", &pybuff))
+        int offset = 0;
+        if (!PyArg_ParseTuple(args, "y*|II", &pybuff, &len, &offset))
             return NULL;
         if (!PyBuffer_IsContiguous(&pybuff, 'A')) {
-            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must be contiguous");
+            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must be contiguous.");
             return NULL;
         }
-        len = pybuff.len;
-        rxbuf = pybuff.buf;
-        if (len < 1) {
-            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must not be empty");
+        if (pybuff.len < 1) {
+            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must not be empty.");
             return NULL;
         }
+        if (len < 0) {
+            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: length must be positive.");
+            return NULL;
+        }
+        if (offset < 0) {
+            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: offset must be positive.");
+            return NULL;
+        }
+        if (offset + len >= pybuff.len) {
+            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: offset+length would exceed buffer.");
+            return NULL;
+        }
+        if (len == 0)
+            len = pybuff.len - offset;
+        rxbuf = pybuff.buf + offset;
     }
     else {
     	if (!PyArg_ParseTuple(args, "i:read", &len))
