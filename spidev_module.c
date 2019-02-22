@@ -224,70 +224,56 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 }
 
 
-#define READBYTES_GENERIC_RESULTTYPE_LIST 0
-#define READBYTES_GENERIC_RESULTTYPE_BYTES 1
-#define READBYTES_GENERIC_RESULTTYPE_BYTEARRAY 2
+/* return true on success */
+static int
+SpiDev_read_lowlevel(SpiDevObject *self, uint8_t *buf, int buflen, int lenreq)
+{
+    int status;
+
+    /* read at least 1 byte, no more than SPIDEV_MAXPATH */
+    if (lenreq < 1)
+        lenreq = 1;
+    else if ((unsigned)lenreq > sizeof(buflen))
+        lenreq = buflen;
+    memset(buf, 0, buflen);
+
+//#define SPIDEV_READ_LOWLEVEL_TESTING
+#ifdef SPIDEV_READ_LOWLEVEL_TESTING
+    { status = lenreq; for (unsigned i = 0; i < lenreq; i++) buf[i] = 64 + i; }
+#else
+	status = read(self->fd, &buf[0], lenreq);
+#endif
+
+	if (status < 0) {
+		PyErr_SetFromErrno(PyExc_IOError);
+		return 0; // fail
+	}
+
+	if (status != lenreq) {
+		printf("Short Read: %d/%d bytes\n", status, lenreq);
+        PyErr_SetString(PyExc_IOError, "SpiDev.readbuffer: I/O error: short read.");
+		return 0; // fail
+	}
+	return 1; // succeed
+}
+
+
+#define READBYTES_GENERIC_RESULTTYPE_LIST       0
+#define READBYTES_GENERIC_RESULTTYPE_BYTES      1
 
 static PyObject *
 SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
 {
-    static uint8_t stackbuf[SPIDEV_MAXPATH];
-	int		status, len = 0;
-	Py_buffer pybuff;
-	uint8_t* rxbuf = stackbuf;
+    static uint8_t rxbuf[SPIDEV_MAXPATH];
+	int len = 0;
 
-    if (resultType == READBYTES_GENERIC_RESULTTYPE_BYTEARRAY) { //existing bytearray
-        int offset = 0;
-        if (!PyArg_ParseTuple(args, "y*|II", &pybuff, &len, &offset))
-            return NULL;
-        if (!PyBuffer_IsContiguous(&pybuff, 'A')) {
-            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must be contiguous.");
-            return NULL;
-        }
-        if (pybuff.len < 1) {
-            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must not be empty.");
-            return NULL;
-        }
-        if (len < 0) {
-            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: length must be positive.");
-            return NULL;
-        }
-        if (offset < 0) {
-            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: offset must be positive.");
-            return NULL;
-        }
-        if (offset + len >= pybuff.len) {
-            PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: offset+length would exceed buffer.");
-            return NULL;
-        }
-        if (len == 0)
-            len = pybuff.len - offset;
-        rxbuf = pybuff.buf + offset;
+    if (!PyArg_ParseTuple(args, "i:read", &len))
+        return NULL;
+
+    // get the bytes here
+    if (!SpiDev_read_lowlevel(self, rxbuf, sizeof(rxbuf), len)) {
+        return NULL;
     }
-    else {
-    	if (!PyArg_ParseTuple(args, "i:read", &len))
-	    	return NULL;
-
-        /* read at least 1 byte, no more than SPIDEV_MAXPATH */
-        if (len < 1)
-            len = 1;
-        else if ((unsigned)len > sizeof(stackbuf))
-            len = sizeof(stackbuf);
-    	memset(rxbuf, 0, sizeof(stackbuf));
-    }
-
-	status = read(self->fd, &rxbuf[0], len);
-
-	if (status < 0) {
-		PyErr_SetFromErrno(PyExc_IOError);
-		return NULL;
-	}
-
-	if (status != len) {
-		printf("Short Read: %d/%d bytes\n", status, len);
-        PyErr_SetString(PyExc_IOError, "SpiDev.readbuffer: I/O error: short read.");
-		return NULL;
-	}
 
 	if (resultType == READBYTES_GENERIC_RESULTTYPE_LIST) { // list
     	int ii;
@@ -306,14 +292,12 @@ SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
         bytes = Py_BuildValue("y#", rxbuf, len);
         return bytes;
     }
-    else if (resultType == READBYTES_GENERIC_RESULTTYPE_BYTEARRAY) { // bytearray
-        Py_RETURN_NONE;
-    }
     else { // unknown type
-        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: internal problem.  Type was not 0, 1 or 2.  Weird.");
+        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: internal problem in readbytes_generic.");
         return NULL;
     }
 }
+
 
 
 PyDoc_STRVAR(SpiDev_read_doc,
@@ -323,7 +307,7 @@ PyDoc_STRVAR(SpiDev_read_doc,
 static PyObject *
 SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 {
-    return SpiDev_readbytes_generic(self, args, 0);
+    return SpiDev_readbytes_generic(self, args, READBYTES_GENERIC_RESULTTYPE_LIST);
 }
 
 PyDoc_STRVAR(SpiDev_readb_doc,
@@ -333,17 +317,50 @@ PyDoc_STRVAR(SpiDev_readb_doc,
 static PyObject *
 SpiDev_readbytesb(SpiDevObject *self, PyObject *args)
 {
-    return SpiDev_readbytes_generic(self, args, 1);
+    return SpiDev_readbytes_generic(self, args, READBYTES_GENERIC_RESULTTYPE_BYTES);
 }
 
+
 PyDoc_STRVAR(SpiDev_readbuffer_doc,
-             "read(bytearray) -> [values]\n\n"
+             "read(bytearray [, length [, offset]]) -> [values]\n\n"
              "Read bytes from SPI device, filling the supplied byte array.\n");
 
 static PyObject *
 SpiDev_readbuffer(SpiDevObject *self, PyObject *args)
 {
-    return SpiDev_readbytes_generic(self, args, 2);
+	Py_buffer pybuff;
+    int offset = 0, len = 0;
+
+    if (!PyArg_ParseTuple(args, "y*|II", &pybuff, &len, &offset))
+        return NULL;
+    if (!PyBuffer_IsContiguous(&pybuff, 'A')) {
+        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must be contiguous.");
+        return NULL;
+    }
+    if (pybuff.len < 1) {
+        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: buffer must not be empty.");
+        return NULL;
+    }
+    if (len < 0) {
+        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: length must be positive.");
+        return NULL;
+    }
+    if (offset < 0 || offset >= pybuff.len - 1) { // NB must be space for at least one byte
+        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: offset out of range.");
+        return NULL;
+    }
+    if (offset + len > pybuff.len) {
+        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: offset+length would overflow buffer.");
+        return NULL;
+    }
+
+    if (len == 0)
+        len = pybuff.len - offset;
+
+    if (!SpiDev_read_lowlevel(self, pybuff.buf + offset, len, len))
+        return NULL;
+
+    Py_RETURN_NONE;
 }
 
 
