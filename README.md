@@ -58,9 +58,9 @@ Read n bytes from SPI device, returning an (immutable) bytes object (more effici
 
     readbuffer(buffer [, length [, offset]])
 
-Read length bytes from SPI device into an existing bytearray object at the given offest.
-If length is not specified or 0, reads to the end of the buffer.
-If offset is not specified, default is 0.
+Read length bytes from SPI device into an existing bytearray object at the given offset (single SPI transfer)
+    If length is not specified or 0, tries to read to the end of the buffer.
+    If offset is not specified, default is 0.
 
     writebytes(list of values)
 
