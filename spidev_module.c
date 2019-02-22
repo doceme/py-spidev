@@ -224,6 +224,10 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 }
 
 
+#define READBYTES_GENERIC_RESULTTYPE_LIST 0
+#define READBYTES_GENERIC_RESULTTYPE_BYTES 1
+#define READBYTES_GENERIC_RESULTTYPE_BYTEARRAY 2
+
 static PyObject *
 SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
 {
@@ -232,7 +236,7 @@ SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
 	Py_buffer pybuff;
 	uint8_t* rxbuf = stackbuf;
 
-    if (resultType == 2) { //existing bytearray
+    if (resultType == READBYTES_GENERIC_RESULTTYPE_BYTEARRAY) { //existing bytearray
         int offset = 0;
         if (!PyArg_ParseTuple(args, "y*|II", &pybuff, &len, &offset))
             return NULL;
@@ -285,7 +289,7 @@ SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
 		return NULL;
 	}
 
-	if (resultType == 0) { // list
+	if (resultType == READBYTES_GENERIC_RESULTTYPE_LIST) { // list
     	int ii;
 	    PyObject	*list;
 	    list = PyList_New(len);
@@ -297,12 +301,12 @@ SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
 
         return list;
     }
-    else if (resultType == 1) { // bytes
+    else if (resultType == READBYTES_GENERIC_RESULTTYPE_BYTES) { // bytes
         PyObject	*bytes;
         bytes = Py_BuildValue("y#", rxbuf, len);
         return bytes;
     }
-    else if (resultType == 2) { // bytearray
+    else if (resultType == READBYTES_GENERIC_RESULTTYPE_BYTEARRAY) { // bytearray
         Py_RETURN_NONE;
     }
     else { // unknown type
