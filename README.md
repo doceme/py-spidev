@@ -48,7 +48,17 @@ Connects to the specified SPI device, opening `/dev/spidev<bus>.<device>`
 
     readbytes(n)
 
-Read n bytes from SPI device.
+Read n bytes from SPI device, returning a list of integers.
+
+    readbytesb(n)
+
+Read n bytes from SPI device, returning an (immutable) bytes object (more efficient for larger transfers).
+
+    readbuffer(buffer [, length [, offset]])
+
+Read length bytes from SPI device into an existing bytearray object at the given offset (single SPI transfer)
+    If length is not specified or 0, tries to read to the end of the buffer.
+    If offset is not specified, default is 0.
 
     writebytes(list of values)
 
