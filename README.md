@@ -48,7 +48,11 @@ Connects to the specified SPI device, opening `/dev/spidev<bus>.<device>`
 
     readbytes(n)
 
-Read n bytes from SPI device.
+Read n bytes from SPI device, returning a list of integers.
+
+    readbytesb(n)
+
+Read n bytes from SPI device, returning an (immutable) bytes object (more efficient for larger transfers).
 
     writebytes(list of values)
 

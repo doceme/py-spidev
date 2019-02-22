@@ -231,48 +231,96 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 	return Py_None;
 }
 
+
+/* return true on success */
+static int
+SpiDev_read_lowlevel(SpiDevObject *self, uint8_t *buf, int buflen, int lenreq)
+{
+    int status;
+
+    /* read at least 1 byte, no more than SPIDEV_MAXPATH */
+    if (lenreq < 1)
+        lenreq = 1;
+    else if ((unsigned)lenreq > sizeof(buflen))
+        lenreq = buflen;
+    memset(buf, 0, buflen);
+
+	status = read(self->fd, &buf[0], lenreq);
+
+	if (status < 0) {
+		PyErr_SetFromErrno(PyExc_IOError);
+		return 0; // fail
+	}
+
+	if (status != lenreq) {
+		printf("Short Read: %d/%d bytes\n", status, lenreq);
+        PyErr_SetString(PyExc_IOError, "SpiDev.read: I/O error: short read.");
+		return 0; // fail
+	}
+	return 1; // succeed
+}
+
+
+#define READBYTES_GENERIC_RESULTTYPE_LIST       0
+#define READBYTES_GENERIC_RESULTTYPE_BYTES      1
+
+static PyObject *
+SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
+{
+    static uint8_t rxbuf[SPIDEV_MAXPATH];
+	int len = 0;
+
+    if (!PyArg_ParseTuple(args, "i:read", &len))
+        return NULL;
+
+    // get the bytes here
+    if (!SpiDev_read_lowlevel(self, rxbuf, sizeof(rxbuf), len)) {
+        return NULL;
+    }
+
+	if (resultType == READBYTES_GENERIC_RESULTTYPE_LIST) { // list
+    	int ii;
+	    PyObject	*list;
+	    list = PyList_New(len);
+
+        for (ii = 0; ii < len; ii++) {
+            PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
+            PyList_SET_ITEM(list, ii, val);
+        }
+
+        return list;
+    }
+    else if (resultType == READBYTES_GENERIC_RESULTTYPE_BYTES) { // bytes
+        PyObject	*bytes;
+        bytes = Py_BuildValue("y#", rxbuf, len);
+        return bytes;
+    }
+    else { // unknown type
+        PyErr_SetString(PyExc_RuntimeError, "SpiDev.read: internal problem in readbytes_generic.");
+        return NULL;
+    }
+}
+
 PyDoc_STRVAR(SpiDev_read_doc,
 	"read(len) -> [values]\n\n"
-	"Read len bytes from SPI device.\n");
+	"Read len bytes from SPI device, returning a list.\n");
 
 static PyObject *
 SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 {
-	uint8_t	rxbuf[SPIDEV_MAXPATH];
-	int		status, len, ii;
-	PyObject	*list;
-
-	if (!PyArg_ParseTuple(args, "i:read", &len))
-		return NULL;
-
-	/* read at least 1 byte, no more than SPIDEV_MAXPATH */
-	if (len < 1)
-		len = 1;
-	else if ((unsigned)len > sizeof(rxbuf))
-		len = sizeof(rxbuf);
-
-	memset(rxbuf, 0, sizeof rxbuf);
-	status = read(self->fd, &rxbuf[0], len);
-
-	if (status < 0) {
-		PyErr_SetFromErrno(PyExc_IOError);
-		return NULL;
-	}
-
-	if (status != len) {
-		perror("short read");
-		return NULL;
-	}
-
-	list = PyList_New(len);
-
-	for (ii = 0; ii < len; ii++) {
-		PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
-		PyList_SET_ITEM(list, ii, val);
-	}
-
-	return list;
+    return SpiDev_readbytes_generic(self, args, READBYTES_GENERIC_RESULTTYPE_LIST);
 }
+
+PyDoc_STRVAR(SpiDev_readb_doc,
+             "read(len) -> bytes(len)\n\n"
+             "Read len bytes from SPI device, returning a bytes object of length len.\n");
+
+static PyObject *
+SpiDev_readbytesb(SpiDevObject *self, PyObject *args)
+{
+    return SpiDev_readbytes_generic(self, args, READBYTES_GENERIC_RESULTTYPE_BYTES);
+}
+
 
 static PyObject *
 SpiDev_writebytes2_buffer(SpiDevObject *self, Py_buffer *buffer)
@@ -869,6 +917,7 @@ SpiDev_xfer3(SpiDevObject *self, PyObject *args)
 	return rx_tuple;
 }
 
+
 static int __spidev_set_mode( int fd, __u8 mode) {
 	__u8 test;
 	if (ioctl(fd, SPI_IOC_WR_MODE, &mode) == -1) {
@@ -1385,6 +1434,8 @@ static PyMethodDef SpiDev_methods[] = {
 		SpiDev_fileno_doc},
 	{"readbytes", (PyCFunction)SpiDev_readbytes, METH_VARARGS,
 		SpiDev_read_doc},
+	{"readbytesb", (PyCFunction)SpiDev_readbytesb, METH_VARARGS,
+		SpiDev_readb_doc},
 	{"writebytes", (PyCFunction)SpiDev_writebytes, METH_VARARGS,
 		SpiDev_write_doc},
 	{"writebytes2", (PyCFunction)SpiDev_writebytes2, METH_VARARGS,
