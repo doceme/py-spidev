@@ -251,7 +251,7 @@ SpiDev_read_lowlevel(SpiDevObject *self, uint8_t *buf, int buflen, int lenreq)
 
 	if (status != lenreq) {
 		printf("Short Read: %d/%d bytes\n", status, lenreq);
-        PyErr_SetString(PyExc_IOError, "SpiDev.readbuffer: I/O error: short read.");
+        PyErr_SetString(PyExc_IOError, "SpiDev.read: I/O error: short read.");
 		return 0; // fail
 	}
 	return 1; // succeed
@@ -293,7 +293,7 @@ SpiDev_readbytes_generic(SpiDevObject *self, PyObject *args, int resultType)
         return bytes;
     }
     else { // unknown type
-        PyErr_SetString(PyExc_RuntimeError, "SpiDev.readbuffer: internal problem in readbytes_generic.");
+        PyErr_SetString(PyExc_RuntimeError, "SpiDev.read: internal problem in readbytes_generic.");
         return NULL;
     }
 }
@@ -311,8 +311,8 @@ SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(SpiDev_readb_doc,
-             "read(len) -> [values]\n\n"
-             "Read len bytes from SPI device, returning a bytes object.\n");
+             "read(len) -> bytes(len)\n\n"
+             "Read len bytes from SPI device, returning a bytes object of length len.\n");
 
 static PyObject *
 SpiDev_readbytesb(SpiDevObject *self, PyObject *args)
