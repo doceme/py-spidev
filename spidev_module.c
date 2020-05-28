@@ -267,7 +267,7 @@ SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 	list = PyList_New(len);
 
 	for (ii = 0; ii < len; ii++) {
-		PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
+		PyObject *val = PyLong_FromLong((long)rxbuf[ii]);
 		PyList_SET_ITEM(list, ii, val);  // Steals reference, no need to Py_DECREF(val)
 	}
 
@@ -586,7 +586,7 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 #endif
 
 	for (ii = 0; ii < len; ii++) {
-		PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
+		PyObject *val = PyLong_FromLong((long)rxbuf[ii]);
 		PySequence_SetItem(seq, ii, val);
 		Py_DECREF(val); // PySequence_SetItem does not steal reference, must Py_DECREF(val)
 	}
@@ -697,7 +697,7 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	}
 
 	for (ii = 0; ii < len; ii++) {
-		PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
+		PyObject *val = PyLong_FromLong((long)rxbuf[ii]);
 		PySequence_SetItem(seq, ii, val);
 		Py_DECREF(val); // PySequence_SetItem does not steal reference, must Py_DECREF(val)
 	}
@@ -846,7 +846,7 @@ SpiDev_xfer3(SpiDevObject *self, PyObject *args)
 			return NULL;
 		}
 		for (ii = 0, jj = block_start; ii < block_size; ii++, jj++) {
-			PyObject *val = Py_BuildValue("l", (long)rxbuf[ii]);
+			PyObject *val = PyLong_FromLong((long)rxbuf[ii]);
 			PyTuple_SetItem(rx_tuple, jj, val);  // Steals reference, no need to Py_DECREF(val)
 		}
 
