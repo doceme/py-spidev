@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from distutils.core import setup, Extension
+from setuptools import setup, Extension
 
 version = "0.0"
 
@@ -27,6 +27,7 @@ setup(	name		= "spidev",
 	version		= version,
 	description	= "Python bindings for Linux SPI access through spidev",
 	long_description= open('README.md').read() + "\n" + open('CHANGELOG.md').read(),
+        long_description_content_type = "text/markdown",
 	author		= "Volker Thoms",
 	author_email	= "unconnected@gmx.de",
 	maintainer	= "Stephen Caudle",
