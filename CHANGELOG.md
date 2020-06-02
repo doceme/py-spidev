@@ -1,6 +1,11 @@
 Changelog
 ---------
 
+3.5
+====
+
+* Fixed memory leaks
+
 3.4
 =====
 
