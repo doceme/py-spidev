@@ -478,8 +478,14 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 		return NULL;
 
 	seq = PySequence_Fast(obj, "expected a sequence");
-	len = PySequence_Fast_GET_SIZE(obj);
-	if (!seq || len <= 0) {
+	if (!seq) {
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
+		return NULL;
+	}
+
+	len = PySequence_Fast_GET_SIZE(seq);
+	if (len <= 0) {
+		Py_DECREF(seq);
 		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
@@ -487,6 +493,7 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	if (len > SPIDEV_MAXPATH) {
 		snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
 		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
+		Py_DECREF(seq);
 		return NULL;
 	}
 
@@ -512,6 +519,7 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 				free(xferptr);
 				free(txbuf);
 				free(rxbuf);
+				Py_DECREF(seq);
 				return NULL;
 			}
 		}
@@ -535,6 +543,7 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 		PyErr_SetFromErrno(PyExc_IOError);
 		free(txbuf);
 		free(rxbuf);
+		Py_DECREF(seq);
 		return NULL;
 	}
 #else
@@ -553,6 +562,7 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 				PyErr_SetString(PyExc_TypeError, wrmsg_text);
 				free(txbuf);
 				free(rxbuf);
+				Py_DECREF(seq);
 				return NULL;
 			}
 		}
@@ -581,6 +591,7 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 		PyErr_SetFromErrno(PyExc_IOError);
 		free(txbuf);
 		free(rxbuf);
+		Py_DECREF(seq);
 		return NULL;
 	}
 #endif
@@ -637,8 +648,14 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 		return NULL;
 
 	seq = PySequence_Fast(obj, "expected a sequence");
-	len = PySequence_Fast_GET_SIZE(obj);
-	if (!seq || len <= 0) {
+	if (!seq) {
+		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
+		return NULL;
+	}
+
+	len = PySequence_Fast_GET_SIZE(seq);
+	if (len <= 0) {
+		Py_DECREF(seq);
 		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
@@ -646,6 +663,7 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	if (len > SPIDEV_MAXPATH) {
 		snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
 		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
+		Py_DECREF(seq);
 		return NULL;
 	}
 
@@ -669,6 +687,7 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 				PyErr_SetString(PyExc_TypeError, wrmsg_text);
 				free(txbuf);
 				free(rxbuf);
+				Py_DECREF(seq);
 				return NULL;
 			}
 		}
@@ -693,6 +712,7 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 		PyErr_SetFromErrno(PyExc_IOError);
 		free(txbuf);
 		free(rxbuf);
+		Py_DECREF(seq);
 		return NULL;
 	}
 
