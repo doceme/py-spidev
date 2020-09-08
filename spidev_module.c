@@ -902,6 +902,9 @@ static int __spidev_set_mode( int fd, __u8 mode) {
 		return -1;
 	}
 	if (test != mode) {
+		PyErr_Format(PyExc_IOError,
+			"Attempted to set mode 0x%x but mode 0x%x returned",
+			(unsigned int)mode, (unsigned int)test);
 		return -1;
 	}
 	return 0;
