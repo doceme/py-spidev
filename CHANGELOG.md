@@ -1,6 +1,11 @@
 Changelog
 ---------
 
+3.6
+====
+
+* Added read0 flag to enable reading 0 bytes after transfer to lower CS when cshigh == True
+
 3.5
 ====
 

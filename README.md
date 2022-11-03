@@ -38,6 +38,7 @@ spi.mode = 0b01
 * `max_speed_hz`
 * `mode` - SPI mode as two bit pattern of clock polarity and phase [CPOL|CPHA], min: 0b00 = 0, max: 0b11 = 3
 * `threewire` - SI/SO signals shared
+* `read0` - Read 0 bytes after transfer to lower CS if cshigh == True
 
 Methods
 -------

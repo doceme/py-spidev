@@ -35,7 +35,7 @@
 #include <sys/ioctl.h>
 #include <linux/ioctl.h>
 
-#define _VERSION_ "3.5"
+#define _VERSION_ "3.6"
 #define SPIDEV_MAXPATH 4096
 
 #define BLOCK_SIZE_CONTROL_FILE "/sys/module/spidev/parameters/bufsiz"
@@ -111,6 +111,7 @@ typedef struct {
 	uint8_t mode;	/* current SPI mode */
 	uint8_t bits_per_word;	/* current SPI bits per word setting */
 	uint32_t max_speed_hz;	/* current SPI max speed setting in Hz */
+	uint8_t read0;	/* read 0 bytes after transfer to lwoer CS if SPI_CS_HIGH */
 } SpiDevObject;
 
 static PyObject *
@@ -607,7 +608,7 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	// reading 0 bytes doesnt matter but brings cs down
 	// tomdean:
 	// Stop generating an extra CS except in mode CS_HOGH
-	if (self->mode & SPI_CS_HIGH) status = read(self->fd, &rxbuf[0], 0);
+	if (self->read0 && (self->mode & SPI_CS_HIGH)) status = read(self->fd, &rxbuf[0], 0);
 
 	free(txbuf);
 	free(rxbuf);
@@ -726,7 +727,7 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	// reading 0 bytes doesn't really matter but brings CS down
 	// tomdean:
 	// Stop generating an extra CS except in mode CS_HOGH
-	if (self->mode & SPI_CS_HIGH) status = read(self->fd, &rxbuf[0], 0);
+	if (self->read0 && (self->mode & SPI_CS_HIGH)) status = read(self->fd, &rxbuf[0], 0);
 
 	Py_BEGIN_ALLOW_THREADS
 	free(txbuf);
@@ -879,7 +880,7 @@ SpiDev_xfer3(SpiDevObject *self, PyObject *args)
 	// reading 0 bytes doesn't really matter but brings CS down
 	// tomdean:
 	// Stop generating an extra CS except in mode CS_HIGH
-	if (self->mode & SPI_CS_HIGH) status = read(self->fd, &rxbuf[0], 0);
+	if (self->read0 && (self->mode & SPI_CS_HIGH)) status = read(self->fd, &rxbuf[0], 0);
 
 	Py_BEGIN_ALLOW_THREADS
 	free(txbuf);
@@ -1283,6 +1284,33 @@ SpiDev_set_max_speed_hz(SpiDevObject *self, PyObject *val, void *closure)
 	return 0;
 }
 
+static PyObject *
+SpiDev_get_read0(SpiDevObject *self, void *closure)
+{
+	PyObject *result = (self->read0 == 1) ? Py_True : Py_False;
+	Py_INCREF(result);
+	return result;
+}
+
+static int
+SpiDev_set_read0(SpiDevObject *self, PyObject *val, void *closure)
+{
+	if (val == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+			"Cannot delete attribute");
+		return -1;
+	}
+	else if (!PyBool_Check(val)) {
+		PyErr_SetString(PyExc_TypeError,
+			"The read0 attribute must be boolean");
+		return -1;
+	}
+
+	self->read0 = (val == Py_True) ? 1 : 0;
+
+	return 0;
+}
+
 static PyGetSetDef SpiDev_getset[] = {
 	{"mode", (getter)SpiDev_get_mode, (setter)SpiDev_set_mode,
 			"SPI mode as two bit pattern of \n"
@@ -1302,6 +1330,8 @@ static PyGetSetDef SpiDev_getset[] = {
 			"bits per word\n"},
 	{"max_speed_hz", (getter)SpiDev_get_max_speed_hz, (setter)SpiDev_set_max_speed_hz,
 			"maximum speed in Hz\n"},
+	{"read0", (getter)SpiDev_get_read0, (setter)SpiDev_set_read0,
+			"Read 0 bytes after transfer to lower CS if cshigh == True\n"},
 	{NULL},
 };
 
