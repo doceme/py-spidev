@@ -1,6 +1,11 @@
 Changelog
 ---------
 
+Unreleased
+====
+
+* Added open_path method to accommodate dynamic SPI bus number allocation
+
 3.6
 ====
 

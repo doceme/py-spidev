@@ -1,0 +1,159 @@
+# An example udev rules file for the python spidev extension:
+#
+# https://pypi.org/project/spidev/
+
+# This file gives examples for setting permissions on spidev device nodes, and
+# creating symbolic links which allow consistent and/or logical device naming.
+#
+# This file would typically be adapted to fit a specific use-case, renamed, and
+# then installed in the /etc/udev/rules.d/ directory.
+#
+# For more information on writing udev rules files, see:
+#
+# - The udev(7) man page.
+# - Tutorial: https://www.reactivated.net/writing_udev_rules.html
+# - Tutorial: https://linuxconfig.org/tutorial-on-how-to-write-basic-udev-rules-in-linux
+# - Tutorial: https://wiki.archlinux.org/title/udev
+
+# The udev rules which ship with your distribution may also provide useful
+# examples.  On most Linux distributions, these are located in:
+# /lib/udev/rules.d/  (local custom rules should be installed in
+# /etc/udev/rules.d instead - as noted above).
+
+# An example of customising the permissions on all spidev files on the system -
+# giving spidev file system device nodes group ownership by the `spi` group and
+# granting read/write permission to user processes in the `spi` group.
+#
+# To use this, the group `spi` must exist on the system e.g.
+#
+#     groupadd --system spi
+#
+#KERNEL=="spidev*", GROUP="spi", MODE="0660"
+
+# Bind spidev driver to chip select 0 of the Beaglebone Black "McSPI0" SPI
+# controller.  This is needed for kernels > ~6.0+ - which do not automatically
+# bind spidev based on the device tree 'compatible' property..
+ACTION=="add", DEVPATH=="*/ocp/*48030000\.spi/spi*\.0", RUN+="/bin/sh -c 'SPI_TARGET_DEVICE=\"$$( basename $$DEVPATH )\" ; echo spidev > /sys/bus/spi/devices/$${SPI_TARGET_DEVICE}/driver_override ; echo $SPI_TARGET_DEVICE > /sys/bus/spi/drivers/spidev/bind'"
+
+# As above, but for McSPI1, CS0.
+ACTION=="add", DEVPATH=="*/ocp/*481a0000\.spi/spi*\.0", RUN+="/bin/sh -c 'SPI_TARGET_DEVICE=\"$$( basename $$DEVPATH )\" ; echo spidev > /sys/bus/spi/devices/$${SPI_TARGET_DEVICE}/driver_override ; echo $SPI_TARGET_DEVICE > /sys/bus/spi/drivers/spidev/bind'"
+
+# As above, but for McSPI1, CS1.
+#ACTION=="add", DEVPATH=="*/ocp/*481a0000\.spi/spi*\.1", RUN+="/bin/sh -c 'SPI_TARGET_DEVICE=\"$$( basename $$DEVPATH )\" ; echo spidev > /sys/bus/spi/devices/$${SPI_TARGET_DEVICE}/driver_override ; echo $SPI_TARGET_DEVICE > /sys/bus/spi/drivers/spidev/bind'"
+
+# Import USB info for USB-attached SPI masters e.g. using the spi_ftdi_mpsse
+# driver.
+SUBSYSTEM=="spi", IMPORT{builtin}="usb_id"
+
+# Bind spidev to SPI chip-select 0 of a specific USB-to-SPI controller based on
+# its USB serial number ("123456789" in this example).
+ACTION=="add", SUBSYSTEM=="spi", ENV{ID_USB_SERIAL_SHORT}="123456789", DEVPATH=="*/spi-ftdi-mpsse*/spi*\.0", RUN+="/bin/sh -c 'SPI_TARGET_DEVICE=\"$$( basename $$DEVPATH )\" ; echo spidev > /sys/bus/spi/devices/$${SPI_TARGET_DEVICE}/driver_override ; echo $SPI_TARGET_DEVICE > /sys/bus/spi/drivers/spidev/bind'"
+
+
+# The following example creates deterministic (AKA "persistent") symlinks for
+# spidev devices under the (created on-demand) directories:
+#
+#    /dev/spi/by-*/
+#
+# First we use the udev 'path_id' builtin, to obtain the 'persistent device
+# path' associated with each spidev.
+#
+# For information on other available udev "built in"s, see the output of:
+#
+#    udevadm test-builtin --help
+#
+# To view the output of the command interactively, you can use a command like
+# the following:
+#
+#    udevadm test-builtin path_id $(udevadm info -q path -n /dev/spidev0.0)
+#
+# The following line makes $env{ID_PATH} available, so that we can use it later
+# when creating our persistent symlinks:
+
+SUBSYSTEM=="spidev", IMPORT{builtin}="path_id"
+
+# Depending on the particular Linux driver implementation, some SPI controllers
+# are abstracted as a single controller which multiple chip selects, whilst
+# others are abstracted as multiple controllers, each of which acts on a single
+# chip select.  For our purposes we need to ensure the chip select is encoded
+# in the deterministic/persistent symlink paths, so we create our own custom
+# attribute "ID_PATH_WITH_CS"....
+
+# If the ID_PATH includes the CS number already, just use that verbatim:
+SUBSYSTEM=="spidev", ENV{ID_PATH}=="?*.spi-cs*", ENV{ID_PATH_WITH_CS}="$env{ID_PATH}"
+
+# ... otherwise append the CS from the spidev number attribute to it.
+SUBSYSTEM=="spidev", ENV{ID_PATH}=="?*.spi", ENV{ID_PATH_WITH_CS}="$env{ID_PATH}-cs-$number"
+
+# Finally create symbolic links under /dev/spi/by-path/ using our custom
+# attribute:
+SUBSYSTEM=="spidev", ENV{ID_PATH_WITH_CS}=="?*", SYMLINK+="spi/by-path/$env{ID_PATH_WITH_CS}"
+
+
+# An alternative example which uses a shell fragment to remove the '.spi' from
+# the persistent device ID (for aesthetic reasons) is included below:
+#SUBSYSTEM=="spidev", ENV{ID_PATH}=="?*-cs*", PROGRAM="/bin/sh -c 'echo ${ID_PATH%%.spi-cs-*}.cs-${DEVNAME#*spidev*.}'", SYMLINK+="spi/by-path/$result"
+#SUBSYSTEM=="spidev", ENV{ID_PATH}=="?*.spi", PROGRAM="/bin/sh -c 'echo ${ID_PATH%%.spi}.cs-${DEVNAME#*spidev*.}'", SYMLINK+="spi/by-path/$result"
+
+# Here we match the spidev device for CS0 of a memory mapped SPI controller (TI
+# AM335x McSPI0 peripheral at 0x48030000), and create a symbolic link which
+# identifies the hardware device which is attached to that spidev:
+#SUBSYSTEM=="spidev", ENV{ID_PATH_WITH_CS}=="platform-48030000.spi-cs-0", SYMLINK+="spi/by-function/opcn3_optical_partical_counter_0"
+
+# As above, but for TI AM33xx McSPI1 peripheral at 0x481a0000.
+#SUBSYSTEM=="spidev", ENV{ID_PATH_WITH_CS}=="platform-481a0000.spi-cs-0", SYMLINK+="spi/by-function/alphasense_ndir_co2_sensor_0"
+
+# A similar pair of rules which instead create symlinks identifying spidev
+# nodes by their physical PCB connector silkscreen labels (i.e. it encodes
+# knowledge of the way that a particular PCB has been designed).
+SUBSYSTEM=="spidev", ENV{ID_PATH_WITH_CS}=="platform-48030000.spi-cs-0", SYMLINK+="spi/by-connector/H1"
+SUBSYSTEM=="spidev", ENV{ID_PATH_WITH_CS}=="platform-481a0000.spi-cs-0", SYMLINK+="spi/by-connector/H3"
+
+# An example for the Raspberry Pi 3, which creates a symbolic link which
+# encodes the pins used on the SBC's 40 pin header (when used with the
+# 'spi0-1cs' or 'spi-2cs' device tree overlays with the default CS0 pin
+# assignment):
+SUBSYSTEM=="spidev", ENV{ID_PATH_WITH_CS}=="platform-3f204000.spi-cs-0", SYMLINK+="spi/by-connector/MOSI19_MISO21_CLK23_CS24"
+
+
+# An example which uses `compat` device tree entries to add symlinks to spidev
+# devices:
+#
+# First import the COMPATITBLE_0 attribute from the parent SPI device:
+SUBSYSTEM=="spidev", IMPORT{parent}="OF_COMPATIBLE_0"
+
+# ...then create symlinks using the imported 'compatible' attribute. Some older
+# device trees use a compatible string 'spidev', which is not useful for our
+# purposes, so we ignore those cases.
+SUBSYSTEM=="spidev", ENV{OF_COMPATIBLE_0}!="spidev", ENV{OF_COMPATIBLE_0}=="?*", SYMLINK+="spi/by-compat/$env{OF_COMPATIBLE_0}"
+
+
+# An example of using the device tree node name of the parent SPI device to
+# create `by-name/` symlinks.
+SUBSYSTEM=="spidev", IMPORT{parent}="OF_NAME"
+
+# ....then use the imported name attribute when creating the symlinks.  As
+# above, a device tree name of 'spidev' isn't descriptive, so skip those.
+SUBSYSTEM=="spidev", ENV{OF_NAME}!="spidev", ENV{OF_COMPATIBLE_0}=="?*", SYMLINK+="spi/by-name/$env{OF_NAME}"
+
+
+# Another set of examples for USB-attached SPI controllers...
+
+# Import USB device info strings for spidev devices which have parent SPI
+# controllers that are USB attached.
+SUBSYSTEM=="spidev", IMPORT{builtin}="usb_id"
+
+# For USB devices using the spi-ftdi-mpsse driver, append the chipselect from
+# the ID_PATH attribute to the USB serial number (which is stored in the FTDI
+# eeprom).
+
+# Derive and store FTDI MPSSE device chip select string for use by subsequent
+# rules as ENV{FTDI-MPSSE-CHIPSELECT}
+SUBSYSTEM=="spidev", ENV{ID_PATH}=="?*spi-ftdi-mpsse*-cs-*", PROGRAM="/bin/sh -c 'echo ${ID_PATH#*mpsse.*-}'", ENV{FTDI-MPSSE-CHIPSELECT}="$result"
+
+# Create the symlink by combining the USB serial number and the chipselect.
+SUBSYSTEM=="spidev", ENV{ID_USB_SERIAL_SHORT}=="?*", SYMLINK+="spi/by-usb-sernum/$env{ID_USB_SERIAL_SHORT}-$env{FTDI-MPSSE-CHIPSELECT}"
+
+# A similar rule which adds a symlink for spi-ftdi-mpsse devices under
+# /dev/spi/by-path as a one-liner:
+SUBSYSTEM=="spidev", ENV{ID_PATH}=="?*spi-ftdi-mpsse*-cs-*", PROGRAM="/bin/sh -c 'echo ${ID_USB_SERIAL_SHORT}-${ID_PATH#*mpsse.*-}'", SYMLINK+="spi/by-path/usb-sernum-$result"
