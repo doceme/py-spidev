@@ -11,7 +11,7 @@ Usage
 ```python
 import spidev
 spi = spidev.SpiDev()
-spi.open(bus, device)
+spi.open_path(spidev_devicefile_path)
 to_send = [0x01, 0x02, 0x03]
 spi.xfer(to_send)
 ```
@@ -21,7 +21,7 @@ Settings
 ```python
 import spidev
 spi = spidev.SpiDev()
-spi.open(bus, device)
+spi.open_path("/dev/spidev0.0")
 
 # Settings (for example)
 spi.max_speed_hz = 5000
@@ -43,9 +43,16 @@ spi.mode = 0b01
 Methods
 -------
 
+    open_path(filesystem_path)
+
+Connects to the specified SPI device special file, following symbolic links if
+appropriate (see note on deterministic SPI bus numbering in the Linux kernel
+below for why this can be advantageous in some configurations).
+
     open(bus, device)
 
-Connects to the specified SPI device, opening `/dev/spidev<bus>.<device>`
+Equivalent to calling `open_path("/dev/spidev<bus>.<device>")`. n.b. **Either**
+`open_path` or `open` should be used.
 
     readbytes(n)
 
