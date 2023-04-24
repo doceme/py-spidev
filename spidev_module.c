@@ -1335,6 +1335,9 @@ static PyGetSetDef SpiDev_getset[] = {
 	{NULL},
 };
 
+static PyObject *
+SpiDev_open_dev(SpiDevObject *self, char *dev_path);
+
 PyDoc_STRVAR(SpiDev_open_doc,
 	"open(bus, device)\n\n"
 	"Connects the object to the specified SPI device.\n"
@@ -1345,8 +1348,6 @@ SpiDev_open(SpiDevObject *self, PyObject *args, PyObject *kwds)
 {
 	int bus, device;
 	char path[SPIDEV_MAXPATH];
-	uint8_t tmp8;
-	uint32_t tmp32;
 	static char *kwlist[] = {"bus", "device", NULL};
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "ii:open", kwlist, &bus, &device))
 		return NULL;
@@ -1355,7 +1356,15 @@ SpiDev_open(SpiDevObject *self, PyObject *args, PyObject *kwds)
 			"Bus and/or device number is invalid.");
 		return NULL;
 	}
-	if ((self->fd = open(path, O_RDWR, 0)) == -1) {
+	return SpiDev_open_dev(self, path);
+}
+
+static PyObject *
+SpiDev_open_dev(SpiDevObject *self, char *dev_path)
+{
+	uint8_t tmp8;
+	uint32_t tmp32;
+	if ((self->fd = open(dev_path, O_RDWR, 0)) == -1) {
 		PyErr_SetFromErrno(PyExc_IOError);
 		return NULL;
 	}
