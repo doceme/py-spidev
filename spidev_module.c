@@ -1336,30 +1336,6 @@ static PyGetSetDef SpiDev_getset[] = {
 };
 
 static PyObject *
-SpiDev_open_dev(SpiDevObject *self, char *dev_path);
-
-PyDoc_STRVAR(SpiDev_open_doc,
-	"open(bus, device)\n\n"
-	"Connects the object to the specified SPI device.\n"
-	"open(X,Y) will open /dev/spidev<X>.<Y>\n");
-
-static PyObject *
-SpiDev_open(SpiDevObject *self, PyObject *args, PyObject *kwds)
-{
-	int bus, device;
-	char path[SPIDEV_MAXPATH];
-	static char *kwlist[] = {"bus", "device", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "ii:open", kwlist, &bus, &device))
-		return NULL;
-	if (snprintf(path, SPIDEV_MAXPATH, "/dev/spidev%d.%d", bus, device) >= SPIDEV_MAXPATH) {
-		PyErr_SetString(PyExc_OverflowError,
-			"Bus and/or device number is invalid.");
-		return NULL;
-	}
-	return SpiDev_open_dev(self, path);
-}
-
-static PyObject *
 SpiDev_open_dev(SpiDevObject *self, char *dev_path)
 {
 	uint8_t tmp8;
@@ -1386,6 +1362,28 @@ SpiDev_open_dev(SpiDevObject *self, char *dev_path)
 
 	Py_INCREF(Py_None);
 	return Py_None;
+}
+
+
+PyDoc_STRVAR(SpiDev_open_doc,
+	"open(bus, device)\n\n"
+	"Connects the object to the specified SPI device.\n"
+	"open(X,Y) will open /dev/spidev<X>.<Y>\n");
+
+static PyObject *
+SpiDev_open(SpiDevObject *self, PyObject *args, PyObject *kwds)
+{
+	int bus, device;
+	char path[SPIDEV_MAXPATH];
+	static char *kwlist[] = {"bus", "device", NULL};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "ii:open", kwlist, &bus, &device))
+		return NULL;
+	if (snprintf(path, SPIDEV_MAXPATH, "/dev/spidev%d.%d", bus, device) >= SPIDEV_MAXPATH) {
+		PyErr_SetString(PyExc_OverflowError,
+			"Bus and/or device number is invalid.");
+		return NULL;
+	}
+	return SpiDev_open_dev(self, path);
 }
 
 static int
