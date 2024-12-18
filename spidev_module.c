@@ -437,7 +437,6 @@ SpiDev_writebytes2(SpiDevObject *self, PyObject *args)
 	// Otherwise, fall back to sequence protocol
 	seq = PySequence_Fast(obj, "expected a sequence");
 	if (seq == NULL) {
-		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
 
@@ -480,7 +479,6 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 
 	seq = PySequence_Fast(obj, "expected a sequence");
 	if (!seq) {
-		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
 
@@ -650,7 +648,6 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 
 	seq = PySequence_Fast(obj, "expected a sequence");
 	if (!seq) {
-		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
 
@@ -773,7 +770,6 @@ SpiDev_xfer3(SpiDevObject *self, PyObject *args)
 
 	seq = PySequence_Fast(obj, "expected a sequence");
 	if (!seq) {
-		PyErr_SetString(PyExc_TypeError, wrmsg_list0);
 		return NULL;
 	}
 
