@@ -85,7 +85,7 @@ Performs an SPI transaction. Chip-select should be held active between blocks.
 
 Similar to `xfer2` but accepts arbitrary large lists.
 If list size exceeds buffer size (which is read from `/sys/module/spidev/parameters/bufsiz`),
-data will be split into smaller chunks and sent in multiple operations.
+data will be split into smaller 4096 byte chunks and sent in multiple operations.
 
     close()
 

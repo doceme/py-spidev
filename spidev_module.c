@@ -39,12 +39,12 @@
 #define SPIDEV_MAXPATH 4096
 
 #define BLOCK_SIZE_CONTROL_FILE "/sys/module/spidev/parameters/bufsiz"
-// The xfwr3 function attempts to use large blocks if /sys/module/spidev/parameters/bufsiz setting allows it.
+// The xfwr function attempts to use large blocks if /sys/module/spidev/parameters/bufsiz setting allows it.
 // However where we cannot get a value from that file, we fall back to this safe default.
-#define XFER3_DEFAULT_BLOCK_SIZE SPIDEV_MAXPATH
-// Largest block size for xfer3 - even if /sys/module/spidev/parameters/bufsiz allows bigger
+#define XFER_DEFAULT_BLOCK_SIZE SPIDEV_MAXPATH
+// Largest block size for xfer - even if /sys/module/spidev/parameters/bufsiz allows bigger
 // blocks, we won't go above this value. As I understand, DMA is not used for anything bigger so why bother.
-#define XFER3_MAX_BLOCK_SIZE 65535
+#define XFER_MAX_BLOCK_SIZE 65535
 
 
 #if PY_MAJOR_VERSION < 3
@@ -60,38 +60,38 @@
 #define PyInt_Type			PyLong_Type
 #endif
 
-// Maximum block size for xfer3
-// Initialised once by get_xfer3_block_size
-uint32_t xfer3_block_size = 0;
+// Maximum block size for xfer
+// Initialised once by get_xfer_block_size
+uint32_t xfer_block_size = 0;
 
 // Read maximum block size from the /sys/module/spidev/parameters/bufsiz
-// In case of any problems reading the number, we fall back to XFER3_DEFAULT_BLOCK_SIZE.
-// If number is read ok but it exceeds the XFER3_MAX_BLOCK_SIZE, it will be capped to that value.
+// In case of any problems reading the number, we fall back to XFER_DEFAULT_BLOCK_SIZE.
+// If number is read ok but it exceeds the XFER_MAX_BLOCK_SIZE, it will be capped to that value.
 // The value is read and cached on the first invocation. Following invocations just return the cached one.
-uint32_t get_xfer3_block_size(void) {
+uint32_t get_xfer_block_size(void) {
 	int value;
 
 	// If value was already initialised, just use it
-	if (xfer3_block_size != 0) {
-		return xfer3_block_size;
+	if (xfer_block_size != 0) {
+		return xfer_block_size;
 	}
 
 	// Start with the default
-	xfer3_block_size = XFER3_DEFAULT_BLOCK_SIZE;
+	xfer_block_size = XFER_DEFAULT_BLOCK_SIZE;
 
 	FILE *file = fopen(BLOCK_SIZE_CONTROL_FILE,"r");
 	if (file != NULL) {
 		if (fscanf(file, "%d", &value) == 1 && value > 0) {
-			if (value <= XFER3_MAX_BLOCK_SIZE) {
-				xfer3_block_size = value;
+			if (value <= XFER_MAX_BLOCK_SIZE) {
+				xfer_block_size = value;
 			} else {
-				xfer3_block_size = XFER3_MAX_BLOCK_SIZE;
+				xfer_block_size = XFER_MAX_BLOCK_SIZE;
 			}
 		}
 		fclose(file);
 	}
 
-	return xfer3_block_size;
+	return xfer_block_size;
 }
 
 PyDoc_STRVAR(SpiDev_module_doc,
@@ -173,12 +173,13 @@ PyDoc_STRVAR(SpiDev_write_doc,
 static PyObject *
 SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 {
-	int		status;
-	uint16_t	ii, len;
-	uint8_t	buf[SPIDEV_MAXPATH];
-	PyObject	*obj;
-	PyObject	*seq;
-	char	wrmsg_text[4096];
+	int status;
+	uint16_t ii, len;
+	PyObject *obj;
+	PyObject *seq;
+	const uint32_t  spi_blk_maxsize = get_xfer_block_size();
+	uint8_t buf[spi_blk_maxsize];
+	char wrmsg_text[spi_blk_maxsize];
 
 	if (!PyArg_ParseTuple(args, "O:write", &obj))
 		return NULL;
@@ -193,8 +194,8 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
-	if (len > SPIDEV_MAXPATH) {
-		snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
+	if (len > spi_blk_maxsize) {
+		snprintf(wrmsg_text, sizeof (wrmsg_text) - 1, wrmsg_listmax, spi_blk_maxsize);
 		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
 		return NULL;
 	}
@@ -242,7 +243,8 @@ PyDoc_STRVAR(SpiDev_read_doc,
 static PyObject *
 SpiDev_readbytes(SpiDevObject *self, PyObject *args)
 {
-	uint8_t	rxbuf[SPIDEV_MAXPATH];
+	const uint32_t spi_blk_maxsize = get_xfer_block_size();
+	uint8_t	rxbuf[spi_blk_maxsize];
 	int		status, len, ii;
 	PyObject	*list;
 
@@ -284,7 +286,7 @@ SpiDev_writebytes2_buffer(SpiDevObject *self, Py_buffer *buffer)
 	int		status;
 	Py_ssize_t	remain, block_size, block_start, spi_max_block;
 
-	spi_max_block = get_xfer3_block_size();
+	spi_max_block = get_xfer_block_size();
 
 	block_start = 0;
 	remain = buffer->len;
@@ -380,7 +382,7 @@ SpiDev_writebytes2_seq(SpiDevObject *self, PyObject *seq)
 		return NULL;
 	}
 
-	spi_max_block = get_xfer3_block_size();
+	spi_max_block = get_xfer_block_size();
 
 	bufsize = (len < spi_max_block) ? len : spi_max_block;
 
@@ -475,7 +477,8 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 	memset(&xfer, 0, sizeof(xfer));
 #endif
 	uint8_t *txbuf, *rxbuf;
-	char	wrmsg_text[4096];
+	const uint32_t spi_blk_maxsize = get_xfer_block_size();
+	char	wrmsg_text[spi_blk_maxsize];
 
 	if (!PyArg_ParseTuple(args, "O|IHB:xfer", &obj, &speed_hz, &delay_usecs, &bits_per_word))
 		return NULL;
@@ -492,8 +495,8 @@ SpiDev_xfer(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
-	if (len > SPIDEV_MAXPATH) {
-		snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
+	if (len > spi_blk_maxsize) {
+		snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_listmax, spi_blk_maxsize);
 		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
 		Py_DECREF(seq);
 		return NULL;
@@ -644,7 +647,8 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 	memset(&xfer, 0, sizeof(xfer));
 	Py_END_ALLOW_THREADS
 	uint8_t *txbuf, *rxbuf;
-	char	wrmsg_text[4096];
+	const uint32_t spi_blk_maxsize = get_xfer_block_size();
+	char wrmsg_text[spi_blk_maxsize];
 
 	if (!PyArg_ParseTuple(args, "O|IHB:xfer2", &obj, &speed_hz, &delay_usecs, &bits_per_word))
 		return NULL;
@@ -661,8 +665,8 @@ SpiDev_xfer2(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
-	if (len > SPIDEV_MAXPATH) {
-		snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_listmax, SPIDEV_MAXPATH);
+	if (len > spi_blk_maxsize) {
+		snprintf(wrmsg_text, sizeof(wrmsg_text) - 1, wrmsg_listmax, spi_blk_maxsize);
 		PyErr_SetString(PyExc_OverflowError, wrmsg_text);
 		Py_DECREF(seq);
 		return NULL;
@@ -783,7 +787,7 @@ SpiDev_xfer3(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
-	bufsize = get_xfer3_block_size();
+	bufsize = get_xfer_block_size();
 	if (bufsize > len) {
 		bufsize = len;
 	}
