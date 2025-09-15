@@ -1,10 +1,15 @@
 Changelog
 ---------
 
-Unreleased
+3.8
 ====
 
 * Added open_path method to accommodate dynamic SPI bus number allocation
+
+3.7
+===
+
+* Fixed installation deprecation warning
 
 3.6
 ====

@@ -35,7 +35,7 @@
 #include <sys/ioctl.h>
 #include <linux/ioctl.h>
 
-#define _VERSION_ "3.7"
+#define _VERSION_ "3.8"
 #define SPIDEV_MAXPATH 4096
 
 #define BLOCK_SIZE_CONTROL_FILE "/sys/module/spidev/parameters/bufsiz"
