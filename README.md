@@ -1,32 +1,48 @@
 # Python Spidev
 
-This project contains a python module for interfacing with SPI devices from
-user space via the spidev linux kernel driver.
+Python interface for the spidev Linux kernel driver for connecting to SPI
+devices.
 
 All code is MIT licensed unless explicitly stated otherwise.
 
 ## Usage
 
 ```python
-import spidev
-spi = spidev.SpiDev()
-spi.open_path(spidev_devicefile_path)
-to_send = [0x01, 0x02, 0x03]
-spi.xfer(to_send)
+from spidev import SpiDev
+
+# bus=0, device=1. Same as path="/dev/spidev0.1"
+with SpiDev(0, 1) as spi:
+    spi.write([0x01, 0x02, 0x03])
+
+# or directly from a path and manually opening/closing the file:
+
+spi = SpiDev(path="/dev/myspidev")
+spi.open()
+
+print(spi.read(64))
+
+spi.close()
 ```
+
 ## Settings
 
 ```python
 import spidev
-spi = spidev.SpiDev()
-spi.open_path("/dev/spidev0.0")
 
-# Settings (for example)
-spi.max_speed_hz = 5000
-spi.mode = 0b01
+# setting options during initialization
+spi = spidev.SpiDev(0, 0, mode=0b01, max_speed_hz=5000)
 
-...
+with spi:
+    spi.read()
+
+# changing options on the go
+spi.mode = 0b11
+
+with spi:
+    spi.read()
 ```
+
+Full list of supported options:
 
 * `bits_per_word`
 * `cshigh`
@@ -48,55 +64,17 @@ spi.mode = 0b01
 
 ## Methods
 
-    open_path(filesystem_path)
+The `SpiDev` class is similar to Python's [I/O Base
+Classes](https://docs.python.org/3/library/io.html#i-o-base-classes), and so
+are its methods. The most important ones are:
 
-Connects to the specified SPI device special file, following symbolic links if
-appropriate (see note on deterministic SPI bus numbering in the Linux kernel
-below for why this can be advantageous in some configurations).
-
-    open(bus, device)
-
-Equivalent to calling `open_path("/dev/spidev<bus>.<device>")`. n.b. **Either**
-`open_path` or `open` should be used.
-
-    readbytes(n)
-
-Read n bytes from SPI device.
-
-    writebytes(list of values)
-
-Writes a list of values to SPI device.
-
-    writebytes2(list of values)
-
-Similar to `writebytes` but accepts arbitrary large lists. If list size exceeds
-buffer size (which is read from `/sys/module/spidev/parameters/bufsiz`), data
-will be split into smaller chunks and sent in multiple operations.
-
-Also, `writebytes2` understands [buffer
-protocol](https://docs.python.org/3/c-api/buffer.html) so it can accept numpy
-byte arrays for example without need to convert them with `tolist()` first.
-This offers much better performance where you need to transfer frames to
-SPI-connected displays for instance.
-
-    xfer(list of values[, speed_hz, delay_usec, bits_per_word])
-
-Performs an SPI transaction. Chip-select should be released and reactivated
-between blocks. Delay specifies the delay in usec between blocks.
-
-    xfer2(list of values[, speed_hz, delay_usec, bits_per_word])
-
-Performs an SPI transaction. Chip-select should be held active between blocks.
-
-    xfer3(list of values[, speed_hz, delay_usec, bits_per_word])
-
-Similar to `xfer2` but accepts arbitrary large lists. If list size exceeds
-buffer size (which is read from `/sys/module/spidev/parameters/bufsiz`), data
-will be split into smaller chunks and sent in multiple operations.
-
-    close()
-
-Disconnects from the SPI device.
+* `close()`: disconnects from the SPI device.
+* `closed`: True if the SPI device is closed.
+* `fileno()`: Underlying file descriptor. `ValueError` if closed.
+* `readable()`: True if not closed.
+* `read(n)`: Read `n` bytes from the SPI device.
+* `writeable()`: True if not closed.
+* `write(b)`: Write bytes to SPI device.
 
 ## The Linux kernel and SPI bus numbering and the role of udev
 
@@ -146,7 +124,7 @@ bus number and SPI chip select number to user space in the form of a POSIX
 A user space program (usually 'udev') listens for kernel device creation
 events, and creates a file system "device node" for user space software to
 interact with.  By convention, for spidev, the device nodes are named
-/dev/spidev<bus>.<device> is (where the *bus* is the Linux kernel's internal
+`/dev/spidev<bus>.<device>` is (where the *bus* is the Linux kernel's internal
 SPI bus number (see below) and the *device* number corresponds to the SPI
 controller "chip select" output pin that is connected to the SPI *device* 'chip
 select' input pin.
@@ -172,22 +150,22 @@ symbolic links to allow identification of block storage devices e.g. see the
 output of `ls -alR /dev/disk`.
 
 `99-local-spi-example-udev.rules` included with py-spidev includes example udev
-rules for creating stable symlink device paths (for use with `open_path`).
+rules for creating stable symlink device paths (for use with SpiDev's `path`
+argument).
 
-e.g. the following Python code could be used to communicate with an SPI device
+E.g. the following Python code could be used to communicate with an SPI device
 attached to chip-select line 0 of an individual FTDI FT232H USB to SPI adapter
 which has the USB serial number "1A8FG636":
 
 
-```
-#!/usr/bin/env python3
+```python
 import spidev
 
-spi = spidev.SpiDev()
-spi.open_path("/dev/spi/by-path/usb-sernum-1A8FG636-cs-0")
-# TODO: Useful stuff here
-spi.close()
+spi = spidev.SpiDev(path="/dev/spi/by-path/usb-sernum-1A8FG636-cs-0")
 
+with spi:
+    # TODO: Useful stuff here
+    ...
 ```
 
 In the more general case, the example udev file should be modified as

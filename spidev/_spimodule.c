@@ -1,5 +1,5 @@
 /*
- * spidev_module.c - Python bindings for Linux SPI access through spidev
+ * _cspi.c - Python bindings for Linux SPI access through spidev
  *
  * MIT License
  *
@@ -1012,28 +1012,8 @@ SpiDev_set_mode(SpiDevObject *self, PyObject *val, void *closure)
 			"Cannot delete attribute");
 		return -1;
 	}
-#if PY_MAJOR_VERSION < 3
-	if (PyInt_Check(val)) {
-		mode = PyInt_AS_LONG(val);
-	} else
-#endif
-	{
-		if (PyLong_Check(val)) {
-			mode = PyLong_AS_LONG(val);
-		} else {
-			PyErr_SetString(PyExc_TypeError,
-				"The mode attribute must be an integer");
-			return -1;
-		}
-	}
 
-
-	if ( mode > 3 ) {
-		PyErr_SetString(PyExc_TypeError,
-			"The mode attribute must be an integer"
-				 "between 0 and 3.");
-		return -1;
-	}
+	mode = PyLong_AS_LONG(val);
 
 	// clean and set CPHA and CPOL bits
 	tmp = ( self->mode & ~(SPI_CPHA | SPI_CPOL) ) | mode ;
@@ -1202,33 +1182,13 @@ SpiDev_get_bits_per_word(SpiDevObject *self, void *closure)
 static int
 SpiDev_set_bits_per_word(SpiDevObject *self, PyObject *val, void *closure)
 {
-	uint8_t bits;
-
 	if (val == NULL) {
 		PyErr_SetString(PyExc_TypeError,
 			"Cannot delete attribute");
 		return -1;
 	}
-#if PY_MAJOR_VERSION < 3
-	if (PyInt_Check(val)) {
-		bits = PyInt_AS_LONG(val);
-	} else
-#endif
-	{
-		if (PyLong_Check(val)) {
-			bits = PyLong_AS_LONG(val);
-		} else {
-			PyErr_SetString(PyExc_TypeError,
-				"The bits_per_word attribute must be an integer");
-			return -1;
-		}
-	}
 
-		if (bits < 8 || bits > 32) {
-		PyErr_SetString(PyExc_TypeError,
-			"invalid bits_per_word (8 to 32)");
-		return -1;
-	}
+	uint8_t bits = PyLong_AS_LONG(val);
 
 	if (self->bits_per_word != bits) {
 		if (ioctl(self->fd, SPI_IOC_WR_BITS_PER_WORD, &bits) == -1) {
@@ -1251,27 +1211,14 @@ SpiDev_get_max_speed_hz(SpiDevObject *self, void *closure)
 static int
 SpiDev_set_max_speed_hz(SpiDevObject *self, PyObject *val, void *closure)
 {
-	uint32_t max_speed_hz;
 
 	if (val == NULL) {
 		PyErr_SetString(PyExc_TypeError,
 			"Cannot delete attribute");
 		return -1;
 	}
-#if PY_MAJOR_VERSION < 3
-	if (PyInt_Check(val)) {
-		max_speed_hz = PyInt_AS_LONG(val);
-	} else
-#endif
-	{
-		if (PyLong_Check(val)) {
-			max_speed_hz = PyLong_AS_LONG(val);
-		} else {
-			PyErr_SetString(PyExc_TypeError,
-				"The max_speed_hz attribute must be an integer");
-			return -1;
-		}
-	}
+
+	uint32_t max_speed_hz = PyLong_AS_LONG(val);
 
 	if (self->max_speed_hz != max_speed_hz) {
 		if (ioctl(self->fd, SPI_IOC_WR_MAX_SPEED_HZ, &max_speed_hz) == -1) {
@@ -1308,6 +1255,27 @@ SpiDev_set_read0(SpiDevObject *self, PyObject *val, void *closure)
 	self->read0 = (val == Py_True) ? 1 : 0;
 
 	return 0;
+}
+
+static PyObject *
+SpiDev_get_settings(SpiDevObject *self, void *closure)
+{
+	PyObject* dict = PyDict_New();
+    if (!dict)
+        return NULL;
+
+	PyDict_SetItemString(dict, "mode", Py_BuildValue("i", (self->mode & (SPI_CPHA | SPI_CPOL))));
+    PyDict_SetItemString(dict, "bits_per_word", Py_BuildValue("i", self->bits_per_word));
+    PyDict_SetItemString(dict, "max_speed_hz", Py_BuildValue("i", self->max_speed_hz));
+    PyDict_SetItemString(dict, "read0", (self->read0 == 1) ? Py_True : Py_False);
+
+    PyDict_SetItemString(dict, "cshigh", (self->mode & SPI_CS_HIGH) ? Py_True : Py_False);
+    PyDict_SetItemString(dict, "threewire", (self->mode & SPI_3WIRE) ? Py_True : Py_False);
+    PyDict_SetItemString(dict, "lsbfirst", (self->mode & SPI_LSB_FIRST) ? Py_True : Py_False);
+    PyDict_SetItemString(dict, "loop", (self->mode & SPI_LOOP) ? Py_True : Py_False);
+    PyDict_SetItemString(dict, "no_cs", (self->mode & SPI_NO_CS) ? Py_True : Py_False);
+
+	return dict;
 }
 
 static PyGetSetDef SpiDev_getset[] = {
@@ -1386,27 +1354,7 @@ SpiDev_open_path(SpiDevObject *self, PyObject *args, PyObject *kwds)
 }
 
 
-PyDoc_STRVAR(SpiDev_open_doc,
-	"open(bus, device)\n\n"
-	"Connects the object to the specified SPI device.\n"
-	"open(X,Y) will open /dev/spidev<X>.<Y>\n");
-
-static PyObject *
-SpiDev_open(SpiDevObject *self, PyObject *args, PyObject *kwds)
-{
-	int bus, device;
-	char path[SPIDEV_MAXPATH];
-	static char *kwlist[] = {"bus", "device", NULL};
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "ii:open", kwlist, &bus, &device))
-		return NULL;
-	if (snprintf(path, SPIDEV_MAXPATH, "/dev/spidev%d.%d", bus, device) >= SPIDEV_MAXPATH) {
-		PyErr_SetString(PyExc_OverflowError,
-			"Bus and/or device number is invalid.");
-		return NULL;
-	}
-	return SpiDev_open_dev(self, path);
-}
-
+// TODO: not necessary anymore?
 static int
 SpiDev_init(SpiDevObject *self, PyObject *args, PyObject *kwds)
 {
@@ -1418,12 +1366,6 @@ SpiDev_init(SpiDevObject *self, PyObject *args, PyObject *kwds)
 			kwlist, &bus, &client))
 		return -1;
 
-	if (bus >= 0) {
-		SpiDev_open(self, args, kwds);
-		if (PyErr_Occurred())
-			return -1;
-	}
-
 	return 0;
 }
 
@@ -1433,35 +1375,7 @@ PyDoc_STRVAR(SpiDevObjectType_doc,
 	"Return a new SPI object that is (optionally) connected to the\n"
 	"specified SPI device interface.\n");
 
-static
-PyObject *SpiDev_enter(PyObject *self, PyObject *args)
-{
-    if (!PyArg_ParseTuple(args, ""))
-        return NULL;
-
-    Py_INCREF(self);
-    return self;
-}
-
-static
-PyObject *SpiDev_exit(SpiDevObject *self, PyObject *args)
-{
-
-    PyObject *exc_type = 0;
-    PyObject *exc_value = 0;
-    PyObject *traceback = 0;
-    if (!PyArg_UnpackTuple(args, "__exit__", 3, 3, &exc_type, &exc_value,
-                           &traceback)) {
-        return 0;
-    }
-
-    SpiDev_close(self);
-    Py_RETURN_FALSE;
-}
-
 static PyMethodDef SpiDev_methods[] = {
-	{"open", (PyCFunction)SpiDev_open, METH_VARARGS | METH_KEYWORDS,
-		SpiDev_open_doc},
 	{"open_path", (PyCFunction)SpiDev_open_path, METH_VARARGS | METH_KEYWORDS,
 		SpiDev_open_path_doc},
 	{"close", (PyCFunction)SpiDev_close, METH_NOARGS,
@@ -1480,10 +1394,6 @@ static PyMethodDef SpiDev_methods[] = {
 		SpiDev_xfer2_doc},
 	{"xfer3", (PyCFunction)SpiDev_xfer3, METH_VARARGS,
 		SpiDev_xfer3_doc},
-	{"__enter__", (PyCFunction)SpiDev_enter, METH_VARARGS,
-		NULL},
-	{"__exit__", (PyCFunction)SpiDev_exit, METH_VARARGS,
-		NULL},
 	{NULL},
 };
 
