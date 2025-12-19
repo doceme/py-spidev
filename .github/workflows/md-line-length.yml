@@ -1,0 +1,19 @@
+name: Check Markdown Line Length
+
+on:
+  pull_request:
+    paths:
+      - "**/*.md"
+
+jobs:
+  check-line-length:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Check line length in Markdown files
+        run: |
+          files=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} -- '*.md')
+          grep -n '.\\{80,\\}' $files && exit 1 || exit 0
