@@ -21,7 +21,7 @@ classifiers = [
     "Topic :: System :: Hardware :: Hardware Drivers",
 ]
 keywords = ["SPI", "Linux", "SPI device"]
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 
 [build-system]
 requires = ["setuptools>=80.0"]
@@ -32,10 +32,10 @@ Repository = "http://github.com/doceme/py-spidev"
 Issues = "https://github.com/doceme/py-spidev/issues"
 Changelog = "https://github.com/doceme/py-spidev/blob/master/CHANGELOG.md"
 
-[tool.setuptools]
-ext-modules = [
-  {name = "spidev", sources = ["spidev_module.c"]}
-]
-
 [tool.setuptools.dynamic]
 readme = {file = ["README.md"], content-type = "text/markdown" }
+
+[tool.setuptools]
+ext-modules = [
+  {name = "spidev._spidev", sources = ["spidev/_spidev.c"]}
+]

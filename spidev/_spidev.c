@@ -1,5 +1,5 @@
 /*
- * spidev_module.c - Python bindings for Linux SPI access through spidev
+ * _spidev.c - Python bindings for Linux SPI access through spidev
  *
  * MIT License
  *
@@ -102,7 +102,8 @@ PyDoc_STRVAR(SpiDev_module_doc,
 	"modules.\n"
 	"\n"
 	"Because the SPI device interface is opened R/W, users of this\n"
-	"module usually must have root permissions.\n");
+	"module usually must have root permissions.\n"
+	"This is a low-level C extension module. Use spidev.SpiDev instead.\n");
 
 typedef struct {
 	PyObject_HEAD
@@ -1480,7 +1481,7 @@ SpiDev_init(SpiDevObject *self, PyObject *args, PyObject *kwds)
 
 
 PyDoc_STRVAR(SpiDevObjectType_doc,
-	"SpiDev([bus],[client]) -> SPI\n\n"
+	"_SpiDev([bus],[client]) -> SPI\n\n"
 	"Return a new SPI object that is (optionally) connected to the\n"
 	"specified SPI device interface.\n");
 
@@ -1545,7 +1546,7 @@ static PyTypeObject SpiDevObjectType = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 #endif
-	"SpiDev",			/* tp_name */
+	"_spidev._SpiDev",			/* tp_name */
 	sizeof(SpiDevObject),		/* tp_basicsize */
 	0,				/* tp_itemsize */
 	(destructor)SpiDev_dealloc,	/* tp_dealloc */
@@ -1591,7 +1592,7 @@ static PyMethodDef SpiDev_module_methods[] = {
 #if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
 	PyModuleDef_HEAD_INIT,
-	"spidev",
+	"_spidev",
 	SpiDev_module_doc,
 	-1,
 	SpiDev_module_methods,
@@ -1608,9 +1609,9 @@ static struct PyModuleDef moduledef = {
 
 #if PY_MAJOR_VERSION >= 3
 PyMODINIT_FUNC
-PyInit_spidev(void)
+PyInit__spidev(void)
 #else
-void initspidev(void)
+void init_spidev(void)
 #endif
 {
 	PyObject* m;
@@ -1626,7 +1627,7 @@ void initspidev(void)
 	m = PyModule_Create(&moduledef);
 	PyObject *version = PyUnicode_FromString(_VERSION_);
 #else
-	m = Py_InitModule3("spidev", SpiDev_module_methods, SpiDev_module_doc);
+	m = Py_InitModule3("_spidev", SpiDev_module_methods, SpiDev_module_doc);
 	PyObject *version = PyString_FromString(_VERSION_);
 #endif
 
@@ -1635,7 +1636,7 @@ void initspidev(void)
 	Py_DECREF(version);
 
 	Py_INCREF(&SpiDevObjectType);
-	PyModule_AddObject(m, "SpiDev", (PyObject *)&SpiDevObjectType);
+	PyModule_AddObject(m, "_SpiDev", (PyObject *)&SpiDevObjectType);
 
 #if PY_MAJOR_VERSION >= 3
 	return m;
