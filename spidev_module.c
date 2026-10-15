@@ -126,7 +126,6 @@ SpiDev_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	self->bits_per_word = 0;
 	self->max_speed_hz = 0;
 
-	Py_INCREF(self);
 	return (PyObject *)self;
 }
 
@@ -147,8 +146,7 @@ SpiDev_close(SpiDevObject *self)
 	self->bits_per_word = 0;
 	self->max_speed_hz = 0;
 
-	Py_INCREF(Py_None);
-	return Py_None;
+	Py_RETURN_NONE;
 }
 
 static void
@@ -231,8 +229,7 @@ SpiDev_writebytes(SpiDevObject *self, PyObject *args)
 		return NULL;
 	}
 
-	Py_INCREF(Py_None);
-	return Py_None;
+	Py_RETURN_NONE;
 }
 
 PyDoc_STRVAR(SpiDev_read_doc,
@@ -309,8 +306,7 @@ SpiDev_writebytes2_buffer(SpiDevObject *self, Py_buffer *buffer)
 		remain -= block_size;
 	}
 
-	Py_INCREF(Py_None);
-	return Py_None;
+	Py_RETURN_NONE;
 }
 
 static PyObject *
@@ -360,8 +356,7 @@ SpiDev_writebytes2_seq_internal(SpiDevObject *self, PyObject *seq, Py_ssize_t le
 		remain -= block_size;
 	}
 
-	Py_INCREF(Py_None);
-	return Py_None;
+	Py_RETURN_NONE;
 }
 
 // In writebytes2 we try to avoild doing malloc/free on each tiny block.
@@ -918,7 +913,6 @@ static PyObject *
 SpiDev_fileno(SpiDevObject *self)
 {
 	PyObject *result = Py_BuildValue("i", self->fd);
-	Py_INCREF(result);
 	return result;
 }
 
@@ -926,7 +920,6 @@ static PyObject *
 SpiDev_get_mode(SpiDevObject *self, void *closure)
 {
 	PyObject *result = Py_BuildValue("i", (self->mode & (SPI_CPHA | SPI_CPOL) ) );
-	Py_INCREF(result);
 	return result;
 }
 
@@ -1196,7 +1189,6 @@ static PyObject *
 SpiDev_get_bits_per_word(SpiDevObject *self, void *closure)
 {
 	PyObject *result = Py_BuildValue("i", self->bits_per_word);
-	Py_INCREF(result);
 	return result;
 }
 
@@ -1245,7 +1237,6 @@ static PyObject *
 SpiDev_get_max_speed_hz(SpiDevObject *self, void *closure)
 {
 	PyObject *result = Py_BuildValue("i", self->max_speed_hz);
-	Py_INCREF(result);
 	return result;
 }
 
@@ -1396,22 +1387,27 @@ SpiDev_open_dev(SpiDevObject *self, char *dev_path)
 	}
 	if (ioctl(self->fd, SPI_IOC_RD_MODE32, &tmp32) == -1) {
 		PyErr_SetFromErrno(PyExc_IOError);
+		close(self->fd);
+		self->fd = -1;
 		return NULL;
 	}
 	self->mode = tmp32;
 	if (ioctl(self->fd, SPI_IOC_RD_BITS_PER_WORD, &tmp8) == -1) {
 		PyErr_SetFromErrno(PyExc_IOError);
+		close(self->fd);
+		self->fd = -1;
 		return NULL;
 	}
 	self->bits_per_word = tmp8;
 	if (ioctl(self->fd, SPI_IOC_RD_MAX_SPEED_HZ, &tmp32) == -1) {
 		PyErr_SetFromErrno(PyExc_IOError);
+		close(self->fd);
+		self->fd = -1;
 		return NULL;
 	}
 	self->max_speed_hz = tmp32;
 
-	Py_INCREF(Py_None);
-	return Py_None;
+	Py_RETURN_NONE;
 }
 
 
@@ -1431,9 +1427,15 @@ SpiDev_open_path(SpiDevObject *self, PyObject *args, PyObject *kwds)
 	if (py_dev_path == NULL)
 		return NULL;
 	dev_path = PyBytes_AsString(py_dev_path);
-	if (dev_path == NULL)
+	if (dev_path == NULL) {
+		Py_DECREF(py_dev_path);
 		return NULL;
-	return SpiDev_open_dev(self, dev_path);
+	}
+	{
+		PyObject *result = SpiDev_open_dev(self, dev_path);
+		Py_DECREF(py_dev_path);
+		return result;
+	}
 }
 
 
@@ -1470,9 +1472,10 @@ SpiDev_init(SpiDevObject *self, PyObject *args, PyObject *kwds)
 		return -1;
 
 	if (bus >= 0) {
-		SpiDev_open(self, args, kwds);
-		if (PyErr_Occurred())
+		PyObject *result = SpiDev_open(self, args, kwds);
+		if (result == NULL)
 			return -1;
+		Py_DECREF(result);
 	}
 
 	return 0;
@@ -1545,43 +1548,15 @@ static PyTypeObject SpiDevObjectType = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 #endif
-	"SpiDev",			/* tp_name */
-	sizeof(SpiDevObject),		/* tp_basicsize */
-	0,				/* tp_itemsize */
-	(destructor)SpiDev_dealloc,	/* tp_dealloc */
-	0,				/* tp_print */
-	0,				/* tp_getattr */
-	0,				/* tp_setattr */
-	0,				/* tp_compare */
-	0,				/* tp_repr */
-	0,				/* tp_as_number */
-	0,				/* tp_as_sequence */
-	0,				/* tp_as_mapping */
-	0,				/* tp_hash */
-	0,				/* tp_call */
-	0,				/* tp_str */
-	0,				/* tp_getattro */
-	0,				/* tp_setattro */
-	0,				/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
-	SpiDevObjectType_doc,		/* tp_doc */
-	0,				/* tp_traverse */
-	0,				/* tp_clear */
-	0,				/* tp_richcompare */
-	0,				/* tp_weaklistoffset */
-	0,				/* tp_iter */
-	0,				/* tp_iternext */
-	SpiDev_methods,			/* tp_methods */
-	0,				/* tp_members */
-	SpiDev_getset,			/* tp_getset */
-	0,				/* tp_base */
-	0,				/* tp_dict */
-	0,				/* tp_descr_get */
-	0,				/* tp_descr_set */
-	0,				/* tp_dictoffset */
-	(initproc)SpiDev_init,		/* tp_init */
-	0,				/* tp_alloc */
-	SpiDev_new,			/* tp_new */
+	.tp_name = "SpiDev",
+	.tp_basicsize = sizeof(SpiDevObject),
+	.tp_dealloc = (destructor)SpiDev_dealloc,
+	.tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+	.tp_doc = SpiDevObjectType_doc,
+	.tp_methods = SpiDev_methods,
+	.tp_getset = SpiDev_getset,
+	.tp_init = (initproc)SpiDev_init,
+	.tp_new = SpiDev_new,
 };
 
 static PyMethodDef SpiDev_module_methods[] = {
